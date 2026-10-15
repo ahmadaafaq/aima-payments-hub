@@ -1,0 +1,6 @@
+{
+  "name": "AIMA Centralized Payment Hub",
+  "description": "Centralized payment gateway hub for All India Management Association (AIMA) applications including MAT, CME, Case League, UGAT, LMA, AMT, AIMA-VCC, and Events.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
