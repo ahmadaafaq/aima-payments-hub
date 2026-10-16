@@ -9,6 +9,7 @@ import { PaymentResult } from './components/PaymentResult';
 import { OriginatingAppSyncDemo } from './components/OriginatingAppSyncDemo';
 import { AdminDashboard } from './components/AdminDashboard';
 import { StakeholderDemoGuide } from './components/StakeholderDemoGuide';
+import { AppRegistry } from './components/AppRegistry';
 import { AimaLogo } from './components/AimaLogo';
 import { AIMA_APPLICATIONS, INITIAL_TRANSACTIONS } from './data/aimaApplications';
 import { 
@@ -93,6 +94,7 @@ export default function App() {
 
   const [lastTransaction, setLastTransaction] = useState<TransactionRecord | null>(null);
   const [checkoutSubView, setCheckoutSubView] = useState<'form' | 'result'>('form');
+  const [sessionReturnUrl, setSessionReturnUrl] = useState<string | null>(null);
 
   // Load initial stored transactions & gateway statuses on mount
   useEffect(() => {
@@ -126,6 +128,57 @@ export default function App() {
       .catch(() => {
         // graceful offline fallback
       });
+
+    // 4. Check for checkout session token in URL path /checkout/:token or ?session=
+    const pathname = window.location.pathname;
+    let sessionToken = '';
+    if (pathname.includes('/checkout/')) {
+      sessionToken = pathname.split('/checkout/')[1]?.split('/')[0] || '';
+    } else {
+      sessionToken = new URLSearchParams(window.location.search).get('session') || '';
+    }
+
+    if (sessionToken) {
+      fetch(`/api/v1/session/${sessionToken}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.session) {
+            const sess = data.session;
+            if (sess.returnUrl) {
+              setSessionReturnUrl(sess.returnUrl);
+            }
+            setActiveOrderId(sess.orderId);
+            if (sess.selectedGateway) {
+              setSelectedGateway(sess.selectedGateway as PaymentGateway);
+            }
+            // Match application
+            const foundApp = AIMA_APPLICATIONS.find(
+              (a) =>
+                a.code.toUpperCase() === sess.sourceCode.toUpperCase() ||
+                a.name.toUpperCase().includes(sess.sourceCode.toUpperCase())
+            ) || AIMA_APPLICATIONS[0];
+            setSelectedApp(foundApp);
+
+            setSelectedApplicant({
+              name: sess.customerName || 'Candidate',
+              refNo: sess.applicationReference || sess.orderId,
+              email: sess.customerEmail || 'applicant@aima.in',
+              phone: sess.customerPhone || '',
+              courseOrEvent: sess.paymentPurpose || 'Case League Registration',
+              feeDescription: sess.paymentPurpose || 'Registration Fee',
+              baseAmount: (sess.amountPaise || 10000) / 100,
+              gstAmount: 0,
+              totalAmount: (sess.amountPaise || 10000) / 100,
+            });
+
+            setActiveTab('checkout');
+            setCheckoutSubView('form');
+          }
+        })
+        .catch((err) => {
+          console.warn('Could not resolve checkout session:', err);
+        });
+    }
   }, []);
 
   const generateOrderId = (appCode: string) => {
@@ -149,6 +202,9 @@ export default function App() {
     setSelectedApplicant(applicant);
     const orderId = customOrderId || generateOrderId(app.code);
     setActiveOrderId(orderId);
+    if (app.assignedGateway) {
+      setSelectedGateway(app.assignedGateway);
+    }
     setInitiationError(null);
     setCheckoutSubView('form');
     setActiveTab('checkout');
@@ -161,6 +217,11 @@ export default function App() {
 
     // GATEWAY 1: Genuine Worldline Sandbox Payment
     if (chosenGateway === 'WORLDLINE_PAYNIMO') {
+      const wlStatus = gatewayStatuses['WORLDLINE_PAYNIMO'];
+      if (wlStatus && !wlStatus.canProcessLiveSandbox) {
+        setInitiationError('Gateway Configuration Error: Worldline / Paynimo sandbox credentials are not configured.');
+        return;
+      }
       setIsInitiating(true);
       try {
         // 1. Create order on server
@@ -196,6 +257,13 @@ export default function App() {
 
     // GATEWAY 2: CCAvenue Live Kit Payment
     if (chosenGateway === 'CCAVENUE') {
+      const ccStatus = gatewayStatuses['CCAVENUE'];
+      if (ccStatus && !ccStatus.canProcessLiveSandbox) {
+        setInitiationError(
+          'Gateway Configuration Error: HDFC / CCAvenue sandbox credentials are not configured. Cannot process payments without active test keys. Falling back to simulator is strictly prohibited.'
+        );
+        return;
+      }
       setIsInitiating(true);
       try {
         const newTxn = await createServerOrder({
@@ -479,7 +547,25 @@ export default function App() {
               currentTxnForDisplay && (
                 <PaymentResult
                   transaction={currentTxnForDisplay}
+                  sessionReturnUrl={sessionReturnUrl}
+                  autoReturnSeconds={2}
                   onReturnToOriginatingApp={() => {
+                    if (sessionReturnUrl && currentTxnForDisplay) {
+                      try {
+                        const target = new URL(sessionReturnUrl);
+                        target.searchParams.set('orderId', currentTxnForDisplay.orderId);
+                        target.searchParams.set('reference', currentTxnForDisplay.applicationRef || currentTxnForDisplay.orderId);
+                        target.searchParams.set('status', currentTxnForDisplay.status);
+                        target.searchParams.set('amount', String(currentTxnForDisplay.totalAmount));
+                        target.searchParams.set('currency', currentTxnForDisplay.currency || 'INR');
+                        target.searchParams.set('gateway', currentTxnForDisplay.gateway);
+                        target.searchParams.set('authCode', currentTxnForDisplay.bankReference || ('AUTH_' + Math.floor(100000 + Math.random() * 900000)));
+                        window.location.href = target.toString();
+                        return;
+                      } catch (err) {
+                        console.warn('Invalid session return URL:', err);
+                      }
+                    }
                     setActiveTab('sync');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
@@ -556,6 +642,11 @@ export default function App() {
             onOpenAdmin={() => setActiveTab('admin')}
             onOpenApps={() => setActiveTab('applications')}
           />
+        )}
+
+        {/* Tab 6: Phase 3 Application Registry (Admin) */}
+        {activeTab === 'registry' && (
+          <AppRegistry />
         )}
       </main>
 

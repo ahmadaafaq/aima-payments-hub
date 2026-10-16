@@ -49,6 +49,9 @@ export interface AimaApplication {
   portalUrl: string;
   accentColor: string;
   gstApplicable: boolean;
+  department?: string;
+  assignedGateway?: PaymentGateway;
+  routingMode?: 'AUTO' | 'USER_SELECTABLE';
   sampleApplicants: ApplicantPreset[];
 }
 

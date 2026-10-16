@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TransactionRecord } from '../types/payment';
 import { formatINR } from '../services/paymentStorage';
 import { AimaLogo } from './AimaLogo';
@@ -20,6 +20,8 @@ import {
 
 interface PaymentResultProps {
   transaction: TransactionRecord;
+  sessionReturnUrl?: string | null;
+  autoReturnSeconds?: number;
   onReturnToOriginatingApp: () => void;
   onRetryPayment: () => void;
   onRecheckPendingStatus?: (transactionId: string) => void;
@@ -27,6 +29,8 @@ interface PaymentResultProps {
 
 export const PaymentResult: React.FC<PaymentResultProps> = ({
   transaction,
+  sessionReturnUrl,
+  autoReturnSeconds = 2,
   onReturnToOriginatingApp,
   onRetryPayment,
   onRecheckPendingStatus,
@@ -37,6 +41,31 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
   const isFailed = transaction.status === 'FAILED';
   const isPending = transaction.status === 'PENDING';
   const isCancelled = transaction.status === 'CANCELLED';
+
+  const [countdown, setCountdown] = useState<number>(autoReturnSeconds);
+  const [isAutoReturning, setIsAutoReturning] = useState<boolean>(Boolean(sessionReturnUrl && isSuccess));
+
+  useEffect(() => {
+    if (!sessionReturnUrl || !isAutoReturning || !isSuccess) return;
+
+    if (countdown <= 0) {
+      onReturnToOriginatingApp();
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          onReturnToOriginatingApp();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [sessionReturnUrl, isAutoReturning, isSuccess, countdown, onReturnToOriginatingApp]);
 
   const handlePrint = () => {
     window.print();
@@ -53,7 +82,44 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Auto-Return Notification Banner */}
+      {sessionReturnUrl && isAutoReturning && isSuccess && (
+        <div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-r from-emerald-950 via-[#002b49] to-slate-900 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-emerald-400/40">
+          <div className="flex items-center gap-3.5">
+            <div className="relative w-11 h-11 shrink-0 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center font-bold font-mono text-base text-emerald-300">
+              {countdown}s
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight">
+                  Payment Verified — Automatically Returning to {transaction.applicationName || transaction.applicationCode}...
+                </h3>
+              </div>
+              <p className="text-xs text-emerald-200/90 mt-0.5">
+                Redirecting back to your application in {countdown} second{countdown === 1 ? '' : 's'} with confirmed payment token.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+            <button
+              onClick={onReturnToOriginatingApp}
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-sm flex items-center gap-1.5"
+            >
+              <span>Return Now</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setIsAutoReturning(false)}
+              className="px-3 py-2 text-xs text-emerald-200/90 hover:text-white underline cursor-pointer"
+            >
+              Stay on Receipt
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Result Banner */}
       <div
         className={`rounded-2xl p-6 sm:p-8 border shadow-sm ${
@@ -159,6 +225,11 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#002b49] hover:bg-[#003860] text-white font-bold rounded-lg shadow-sm transition-colors cursor-pointer"
             >
               <span>Return to {transaction.applicationCode} Application</span>
+              {sessionReturnUrl && isAutoReturning && isSuccess && (
+                <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-emerald-400 text-slate-950 font-bold rounded-full font-mono">
+                  {countdown}s
+                </span>
+              )}
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { AimaLogo } from './AimaLogo';
 import { RotateCcw } from 'lucide-react';
 
-export type ActiveTab = 'applications' | 'checkout' | 'admin' | 'sync' | 'guide';
+export type ActiveTab = 'applications' | 'checkout' | 'admin' | 'sync' | 'guide' | 'registry';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -89,6 +89,17 @@ export const Header: React.FC<HeaderProps> = ({
             >
               Demo Guide
             </button>
+            <button
+              onClick={() => onSelectTab('registry')}
+              className={`hover:text-amber-300 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 flex items-center gap-1.5 ${
+                activeTab === 'registry'
+                  ? 'border-amber-400 text-amber-300 font-semibold'
+                  : 'border-transparent text-slate-200'
+              }`}
+            >
+              App Registry
+              <span className="text-[10px] bg-amber-400 text-[#00223b] px-1 rounded font-bold">P3</span>
+            </button>
           </nav>
 
           {/* Zone 3: 1 primary action */}
@@ -136,6 +147,12 @@ export const Header: React.FC<HeaderProps> = ({
           className={`px-2 py-1 whitespace-nowrap shrink-0 ${activeTab === 'guide' ? 'text-amber-400 font-bold' : 'text-slate-300'}`}
         >
           Demo Guide
+        </button>
+        <button
+          onClick={() => onSelectTab('registry')}
+          className={`px-2 py-1 whitespace-nowrap shrink-0 ${activeTab === 'registry' ? 'text-amber-400 font-bold' : 'text-slate-300'}`}
+        >
+          Registry
         </button>
       </div>
 

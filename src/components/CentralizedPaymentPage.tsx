@@ -110,7 +110,13 @@ export const CentralizedPaymentPage: React.FC<CentralizedPaymentPageProps> = ({
   const simStatus = gatewayStatuses['DEMO_SIMULATOR'];
 
   // Worldline & CCAvenue test transactions scale to ₹2.00 test charges
-  const actualGatewayCharge = (isWorldline || isCCAvenue) ? 2.0 : applicant.totalAmount;
+  const actualGatewayCharge = (isWorldline || isCCAvenue) ? 2.0 : applicant.totalAmount;  const isAutoRouted = application.routingMode !== 'USER_SELECTABLE';
+
+  useEffect(() => {
+    if (isAutoRouted && application.assignedGateway && selectedGateway !== application.assignedGateway) {
+      onSelectGateway(application.assignedGateway);
+    }
+  }, [application, isAutoRouted, selectedGateway, onSelectGateway]);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -131,7 +137,7 @@ export const CentralizedPaymentPage: React.FC<CentralizedPaymentPageProps> = ({
               {orderId}
             </span>
           </div>
-          <div className="flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-mono">
+          <div className="flex items-center gap-1.5 text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-mono">
             <Clock className="w-3.5 h-3.5" />
             <span>Session: {formattedTime}</span>
           </div>
@@ -252,22 +258,42 @@ export const CentralizedPaymentPage: React.FC<CentralizedPaymentPageProps> = ({
         {/* Right Column (5 cols): Gateway Selection & Checkout CTA */}
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                Select Payment Mode / Gateway
-              </h3>
-            </div>
-            <p className="text-xs text-slate-500 mb-4">
-              Choose between genuine gateway sandbox processing or presentation simulator:
-            </p>
+            {isAutoRouted ? (
+              <div className="mb-4 pb-3 border-b border-slate-100">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-[#002b49]" />
+                    <span>Assigned Gateway</span>
+                  </h3>
+                  <span className="text-[10px] font-bold uppercase bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                    {application.department || 'CME'} Policy
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Automatically routed to <strong>{selectedGateway === 'WORLDLINE_PAYNIMO' ? 'Worldline / Paynimo' : 'HDFC / CCAvenue'}</strong> by institutional policy.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                    Select Payment Mode / Gateway
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 mb-4">
+                  Choose between genuine gateway sandbox processing or presentation simulator:
+                </p>
+              </>
+            )}
 
             {/* OPTION 1: Worldline / Paynimo — Sandbox */}
+            {(!isAutoRouted || selectedGateway === 'WORLDLINE_PAYNIMO') && (
             <div
               onClick={() => onSelectGateway('WORLDLINE_PAYNIMO')}
-              className={`p-4 rounded-xl border transition-all cursor-pointer mb-3 relative ${
+              className={`p-4 rounded-xl border transition-all ${!isAutoRouted ? 'cursor-pointer hover:border-slate-300' : 'cursor-default'} mb-3 relative ${
                 selectedGateway === 'WORLDLINE_PAYNIMO'
                   ? 'border-[#002b49] bg-sky-50/40 ring-2 ring-[#002b49]/20 shadow-sm'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
+                  : 'border-slate-200 bg-white'
               }`}
             >
               <div className="flex items-start justify-between">
@@ -305,14 +331,16 @@ export const CentralizedPaymentPage: React.FC<CentralizedPaymentPageProps> = ({
                 {getStatusBadge(wlStatus)}
               </div>
             </div>
+            )}
 
             {/* OPTION 2: CCAvenue — HDFC Live Kit */}
+            {(!isAutoRouted || selectedGateway === 'CCAVENUE') && (
             <div
               onClick={() => onSelectGateway('CCAVENUE')}
-              className={`p-4 rounded-xl border transition-all cursor-pointer mb-3 relative ${
+              className={`p-4 rounded-xl border transition-all ${!isAutoRouted ? 'cursor-pointer hover:border-slate-300' : 'cursor-default'} mb-3 relative ${
                 selectedGateway === 'CCAVENUE'
                   ? 'border-[#002b49] bg-sky-50/40 ring-2 ring-[#002b49]/20 shadow-sm'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
+                  : 'border-slate-200 bg-white'
               }`}
             >
               <div className="flex items-start justify-between">
@@ -350,8 +378,10 @@ export const CentralizedPaymentPage: React.FC<CentralizedPaymentPageProps> = ({
                 {getStatusBadge(ccStatus)}
               </div>
             </div>
+            )}
 
-            {/* OPTION 3: Demo Simulator (Phase 1) */}
+            {/* OPTION 3: Demo Simulator (Phase 1) — Only shown if not auto-routed */}
+            {!isAutoRouted && (
             <div
               onClick={() => onSelectGateway('DEMO_SIMULATOR')}
               className={`p-4 rounded-xl border transition-all cursor-pointer relative ${
@@ -395,6 +425,23 @@ export const CentralizedPaymentPage: React.FC<CentralizedPaymentPageProps> = ({
                 {getStatusBadge(simStatus)}
               </div>
             </div>
+            )}
+
+            {/* Configuration Blocker Alert for CCAvenue */}
+            {isCCAvenue && !ccStatus?.canProcessLiveSandbox && (
+              <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-950 space-y-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-rose-900">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>Gateway Sandbox Configuration Required</span>
+                </div>
+                <p className="text-[11px] text-rose-800 leading-relaxed">
+                  {ccStatus?.blockerDetails || 'HDFC / CCAvenue sandbox credentials are not configured. The Payment Hub strictly prevents falling back to simulated success for genuine application payment orders.'}
+                </p>
+                <div className="text-[10px] text-rose-700 font-mono">
+                  Missing variables: {ccStatus?.missingEnvVars.join(', ') || 'CCAVENUE_WORKING_KEY'}
+                </div>
+              </div>
+            )}
 
             {/* Dynamic Status / Blocker Explanations */}
             {isWorldline && (

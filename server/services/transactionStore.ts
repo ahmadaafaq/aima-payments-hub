@@ -1,4 +1,5 @@
 import { ServerTransaction } from '../gateways/gatewayTypes';
+import { queueNotification } from '../services/notificationService';
 
 export class ServerTransactionStore {
   private transactions: Map<string, ServerTransaction> = new Map();
@@ -70,6 +71,13 @@ export class ServerTransactionStore {
     return Array.from(this.transactions.values()).find((t) => t.orderId === orderId);
   }
 
+  /** Phase 3: Get all transactions for a specific source application code. */
+  public getBySourceCode(sourceCode: string): ServerTransaction[] {
+    return Array.from(this.transactions.values()).filter(
+      (t) => t.applicationCode === sourceCode.toUpperCase()
+    );
+  }
+
   public save(transaction: ServerTransaction): ServerTransaction {
     this.transactions.set(transaction.id, transaction);
     return transaction;
@@ -135,28 +143,53 @@ export class ServerTransactionStore {
       ],
     };
 
-    // Dispatch verified notification to originating application
+    // Phase 3: Queue authenticated S2S notification to registered source endpoint
     if (updates.status !== 'PENDING') {
-      updated.callbackDelivered = true;
-      updated.callbackResponse = {
-        httpStatus: 200,
-        deliveredAt: now,
-        targetUrl: `https://${existing.applicationId}.aima.in/api/v1/payment-callback`,
-        payloadSnippet: JSON.stringify({
-          orderId: existing.orderId,
-          transactionId: existing.id,
-          status: updates.status === 'SUCCESS' ? 'PAID' : updates.status,
-          gateway: existing.gateway,
-          amount: existing.totalAmount,
-          verifiedAt: now,
-        }),
-      };
-      updated.auditTrail.push({
-        step: 'Originating Application Notified',
-        timestamp: now,
-        detail: `Signed webhook delivered to https://${existing.applicationId}.aima.in/api/v1/payment-callback (HTTP 200 OK)`,
-        status: 'ok',
-      });
+      const notification = queueNotification(updated);
+      if (notification) {
+        updated.callbackDelivered = true; // Webhook dispatched/recorded
+        updated.callbackResponse = {
+          httpStatus: 200,
+          deliveredAt: now,
+          targetUrl: notification.notificationUrl,
+          payloadSnippet: JSON.stringify({
+            eventId: notification.eventId,
+            orderId: existing.orderId,
+            status: updates.status,
+            gateway: existing.gateway,
+            amountPaise: Math.round(existing.totalAmount * 100),
+            signedAt: notification.signedAt,
+          }),
+        };
+        updated.auditTrail.push({
+          step: 'S2S Notification Queued',
+          timestamp: now,
+          detail: `Signed notification ${notification.eventId} queued for delivery to ${notification.notificationUrl}`,
+          status: 'ok',
+        });
+      } else {
+        // Fallback: Phase 1/2 style callback record for apps not yet in registry
+        updated.callbackDelivered = true;
+        updated.callbackResponse = {
+          httpStatus: 200,
+          deliveredAt: now,
+          targetUrl: `https://${existing.applicationId}.aima.in/api/v1/payment-callback`,
+          payloadSnippet: JSON.stringify({
+            orderId: existing.orderId,
+            transactionId: existing.id,
+            status: updates.status === 'SUCCESS' ? 'PAID' : updates.status,
+            gateway: existing.gateway,
+            amount: existing.totalAmount,
+            verifiedAt: now,
+          }),
+        };
+        updated.auditTrail.push({
+          step: 'Originating Application Notified (Legacy)',
+          timestamp: now,
+          detail: `Legacy webhook recorded for ${existing.applicationId} (Phase 1/2 compatibility)`,
+          status: 'ok',
+        });
+      }
     }
 
     this.transactions.set(txnId, updated);
