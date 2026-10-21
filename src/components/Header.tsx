@@ -28,7 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Brand Lockup element */}
           <button
             onClick={() => {
-              if (!hideNavigation) onSelectTab('applications');
+              if (!hideNavigation) onSelectTab('checkout');
             }}
             className="flex items-center text-left hover:opacity-95 transition-opacity whitespace-nowrap shrink-0 cursor-pointer"
             aria-label="AIMA Payment Hub Home"
@@ -47,16 +47,6 @@ export const Header: React.FC<HeaderProps> = ({
               {/* Desktop Nav Links */}
               <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
                 <button
-                  onClick={() => onSelectTab('applications')}
-                  className={`hover:text-amber-300 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 cursor-pointer ${
-                    activeTab === 'applications'
-                      ? 'border-amber-400 text-amber-300 font-semibold'
-                      : 'border-transparent text-slate-200'
-                  }`}
-                >
-                  Applications
-                </button>
-                <button
                   onClick={() => onSelectTab('checkout')}
                   className={`hover:text-amber-300 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 flex items-center gap-1.5 cursor-pointer ${
                     activeTab === 'checkout'
@@ -68,6 +58,16 @@ export const Header: React.FC<HeaderProps> = ({
                   {hasActiveOrder && (
                     <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
                   )}
+                </button>
+                <button
+                  onClick={() => onSelectTab('applications')}
+                  className={`hover:text-amber-300 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 cursor-pointer ${
+                    activeTab === 'applications'
+                      ? 'border-amber-400 text-amber-300 font-semibold'
+                      : 'border-transparent text-slate-200'
+                  }`}
+                >
+                  Applications
                 </button>
                 <button
                   onClick={() => onSelectTab('admin')}
@@ -96,20 +96,20 @@ export const Header: React.FC<HeaderProps> = ({
       {!hideNavigation && (
         <div className="md:hidden flex items-center justify-around border-t border-[#0d4670] bg-[#00223b] px-2 py-2 text-xs overflow-x-auto">
           <button
-            onClick={() => onSelectTab('applications')}
-            className={`px-3 py-1 whitespace-nowrap shrink-0 cursor-pointer ${
-              activeTab === 'applications' ? 'text-amber-400 font-bold' : 'text-slate-300'
-            }`}
-          >
-            Applications
-          </button>
-          <button
             onClick={() => onSelectTab('checkout')}
             className={`px-3 py-1 whitespace-nowrap shrink-0 cursor-pointer ${
               activeTab === 'checkout' ? 'text-amber-400 font-bold' : 'text-slate-300'
             }`}
           >
             Payment Hub {hasActiveOrder && '•'}
+          </button>
+          <button
+            onClick={() => onSelectTab('applications')}
+            className={`px-3 py-1 whitespace-nowrap shrink-0 cursor-pointer ${
+              activeTab === 'applications' ? 'text-amber-400 font-bold' : 'text-slate-300'
+            }`}
+          >
+            Applications
           </button>
           <button
             onClick={() => onSelectTab('admin')}

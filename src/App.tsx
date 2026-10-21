@@ -46,10 +46,20 @@ export default function App() {
     if (pathname.includes('/checkout/') || search.has('session')) {
       return 'checkout';
     }
-    if (pathname.includes('/admin') || pathname.startsWith('/payments') || search.get('tab') === 'admin' || search.has('admin')) {
+    if (pathname.includes('/admin') || search.get('tab') === 'admin' || search.has('admin')) {
       return 'admin';
     }
-    return 'applications';
+    if (pathname.includes('/applications') || search.get('tab') === 'applications') {
+      return 'applications';
+    }
+    if (pathname.includes('/sync') || search.get('tab') === 'sync') {
+      return 'sync';
+    }
+    if (pathname.includes('/guide') || search.get('tab') === 'guide') {
+      return 'guide';
+    }
+    // Default root and /payments to Payment Hub
+    return 'checkout';
   };
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(getInitialTab);
