@@ -163,7 +163,7 @@ export class SourceApplicationRegistry {
   }
 
   public persistToDisk() {
-    if (process.env.NODE_ENV === 'test' || process.argv.some((a) => a.includes('.test.'))) return;
+    if (process.env.VERCEL || process.env.NODE_ENV === 'test' || process.argv.some((a) => a.includes('.test.'))) return;
     try {
       const arr = Array.from(this.applications.values());
       fs.writeFileSync(APPS_FILE_PATH, JSON.stringify(arr, null, 2), 'utf-8');

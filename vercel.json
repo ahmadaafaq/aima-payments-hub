@@ -6,22 +6,22 @@
   "rewrites": [
     {
       "source": "/pay",
-      "destination": "/api/index.ts"
+      "destination": "/api"
     },
     {
       "source": "/api/pay",
-      "destination": "/api/index.ts"
+      "destination": "/api"
     },
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+      "source": "/api/:path*",
+      "destination": "/api"
     },
     {
-      "source": "/checkout/(.*)",
+      "source": "/checkout/:path*",
       "destination": "/index.html"
     },
     {
-      "source": "/payments/(.*)",
+      "source": "/payments/:path*",
       "destination": "/index.html"
     },
     {
@@ -29,7 +29,11 @@
       "destination": "/index.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/admin",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/((?!api|pay).*)",
       "destination": "/index.html"
     }
   ]

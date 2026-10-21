@@ -67,6 +67,7 @@ export class ServerTransactionStore {
   }
 
   private persistToDisk() {
+    if (process.env.VERCEL || process.env.NODE_ENV === 'test') return;
     try {
       const arr = Array.from(this.transactions.values());
       fs.writeFileSync(TXN_FILE_PATH, JSON.stringify(arr, null, 2), 'utf-8');
