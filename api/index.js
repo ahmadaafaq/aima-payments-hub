@@ -969,7 +969,7 @@ var init_sourceApplications = __esm({
        * All amounts are in paise (integer).
        */
       validateAmount(app2, paymentPurpose, amountPaise) {
-        const rule = app2.amountRules.find((r) => r.paymentPurpose === paymentPurpose);
+        const rule = app2.amountRules.find((r) => r.paymentPurpose === paymentPurpose) || app2.amountRules[0];
         if (!rule) {
           return { valid: false, reason: `No amount rule configured for purpose: ${paymentPurpose}` };
         }

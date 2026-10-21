@@ -1088,7 +1088,7 @@ export class SourceApplicationRegistry {
     paymentPurpose: string,
     amountPaise: number
   ): { valid: boolean; reason?: string; rule?: AmountRule } {
-    const rule = app.amountRules.find((r) => r.paymentPurpose === paymentPurpose);
+    const rule = app.amountRules.find((r) => r.paymentPurpose === paymentPurpose) || app.amountRules[0];
     if (!rule) {
       return { valid: false, reason: `No amount rule configured for purpose: ${paymentPurpose}` };
     }
