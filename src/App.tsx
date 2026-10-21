@@ -37,29 +37,24 @@ import {
   postWorldlineCallback,
   recordSimulatorTransactionApi 
 } from './services/gatewayApi';
+import { DirectAccessRestricted } from './components/DirectAccessRestricted';
 import { ShieldCheck, Info, CheckCircle2, RotateCcw, AlertTriangle, Clock, ArrowRight } from 'lucide-react';
 
 export default function App() {
   const getInitialTab = (): ActiveTab => {
     const pathname = window.location.pathname;
     const search = new URLSearchParams(window.location.search);
-    if (pathname.includes('/checkout/') || search.has('session')) {
-      return 'checkout';
-    }
     if (pathname.includes('/admin') || search.get('tab') === 'admin' || search.has('admin')) {
       return 'admin';
     }
-    if (pathname.includes('/applications') || search.get('tab') === 'applications') {
+    if (pathname.includes('/checkout/') || search.has('session')) {
+      return 'checkout';
+    }
+    if (search.get('dev') === 'true' || pathname.startsWith('/dev')) {
       return 'applications';
     }
-    if (pathname.includes('/sync') || search.get('tab') === 'sync') {
-      return 'sync';
-    }
-    if (pathname.includes('/guide') || search.get('tab') === 'guide') {
-      return 'guide';
-    }
-    // Default root and /payments to Payment Hub
-    return 'checkout';
+    // Direct access to / or /payments without active checkout session or admin is restricted
+    return 'restricted';
   };
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(getInitialTab);
@@ -254,7 +249,17 @@ export default function App() {
         })
         .catch((err) => {
           console.warn('Could not resolve checkout session:', err);
+          setSessionError({
+            code: 'SESSION_NOT_FOUND',
+            message: 'Unable to connect to payment server to verify session.',
+          });
+          setActiveTab('checkout');
         });
+    } else {
+      const search = new URLSearchParams(window.location.search);
+      if (!pathname.includes('/admin') && !search.has('admin') && !search.has('dev')) {
+        setActiveTab('restricted');
+      }
     }
   }, []);
 
@@ -637,7 +642,12 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Tab 1: Applications Dashboard */}
+        {/* State 0: Direct Access Restricted (Default for / and /payments without token) */}
+        {activeTab === 'restricted' && (
+          <DirectAccessRestricted onGoToAdmin={() => setActiveTab('admin')} />
+        )}
+
+        {/* Tab 1: Applications Dashboard (Dev mode only) */}
         {activeTab === 'applications' && (
           <ApplicationSelector onInitiatePayment={handleInitiatePayment} />
         )}

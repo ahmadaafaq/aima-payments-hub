@@ -1,8 +1,8 @@
 import React from 'react';
 import { AimaLogo } from './AimaLogo';
-import { ShieldCheck, Lock } from 'lucide-react';
+import { ShieldCheck, Lock, Shield } from 'lucide-react';
 
-export type ActiveTab = 'applications' | 'checkout' | 'admin' | 'sync' | 'guide';
+export type ActiveTab = 'restricted' | 'checkout' | 'admin' | 'applications' | 'sync' | 'guide';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -15,8 +15,12 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onSelectTab,
   hasActiveOrder,
-  hideNavigation = false,
 }) => {
+  const isDevMode = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).get('dev') === 'true' ||
+    window.location.pathname.startsWith('/dev')
+  );
+
   return (
     <header className="sticky top-0 z-40 bg-[#002b49] text-white shadow-md border-b border-[#0a4b78]">
       {/* Institutional Top Accent Ribbon (Tricolor subtle bar) */}
@@ -26,102 +30,71 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-8 h-16">
           {/* Brand Lockup element */}
-          <button
-            onClick={() => {
-              if (!hideNavigation) onSelectTab('checkout');
-            }}
-            className="flex items-center text-left hover:opacity-95 transition-opacity whitespace-nowrap shrink-0 cursor-pointer"
-            aria-label="AIMA Payment Hub Home"
-          >
-            <AimaLogo size="sm" variant="light" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                if (activeTab === 'admin') return;
+                onSelectTab('restricted');
+              }}
+              className="flex items-center text-left hover:opacity-95 transition-opacity whitespace-nowrap shrink-0 cursor-pointer"
+              aria-label="AIMA Centralized Payment Service"
+            >
+              <AimaLogo size="sm" variant="light" />
+            </button>
 
-          {/* If hideNavigation is TRUE (e.g. source redirect to checkout), show only secure payment badge */}
-          {hideNavigation ? (
-            <div className="flex items-center gap-2 text-xs text-amber-300 font-semibold bg-white/10 px-3 py-1.5 rounded-full border border-white/10">
-              <Lock className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Official Institutional Payment Gateway</span>
+            {activeTab === 'admin' && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-400/20 text-amber-300 border border-amber-400/30 text-xs font-bold uppercase tracking-wider">
+                <Lock className="w-3 h-3 text-amber-400" />
+                Admin Console
+              </span>
+            )}
+          </div>
+
+          {/* Right Status Badge */}
+          {activeTab === 'admin' ? (
+            <div className="flex items-center gap-2 text-xs text-amber-300 font-semibold bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
+              <Shield className="w-3.5 h-3.5 text-amber-400" />
+              <span>Institutional Administration Console</span>
             </div>
           ) : (
-            <>
-              {/* Desktop Nav Links */}
-              <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-                <button
-                  onClick={() => onSelectTab('checkout')}
-                  className={`hover:text-amber-300 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 flex items-center gap-1.5 cursor-pointer ${
-                    activeTab === 'checkout'
-                      ? 'border-amber-400 text-amber-300 font-semibold'
-                      : 'border-transparent text-slate-200'
-                  }`}
-                >
-                  Payment Hub
-                  {hasActiveOrder && (
-                    <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
-                  )}
-                </button>
-                <button
-                  onClick={() => onSelectTab('applications')}
-                  className={`hover:text-amber-300 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 cursor-pointer ${
-                    activeTab === 'applications'
-                      ? 'border-amber-400 text-amber-300 font-semibold'
-                      : 'border-transparent text-slate-200'
-                  }`}
-                >
-                  Applications
-                </button>
-                <button
-                  onClick={() => onSelectTab('admin')}
-                  className={`hover:text-amber-300 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 flex items-center gap-1.5 cursor-pointer ${
-                    activeTab === 'admin'
-                      ? 'border-amber-400 text-amber-300 font-semibold'
-                      : 'border-transparent text-slate-200'
-                  }`}
-                >
-                  <Lock className="w-3.5 h-3.5 text-amber-400" />
-                  Admin Console
-                </button>
-              </nav>
+            <div className="flex items-center gap-2 text-xs text-emerald-300 font-semibold bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Official Institutional Gateway · 256-Bit SSL</span>
+            </div>
+          )}
 
-              {/* Right Security Badge */}
-              <div className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-300">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span className="font-semibold">256-bit SSL Encrypted</span>
-              </div>
-            </>
+          {/* Optional Dev Mode Only Tabs (Only visible if ?dev=true) */}
+          {isDevMode && (
+            <nav className="hidden lg:flex items-center gap-4 text-xs font-medium bg-black/30 px-3 py-1 rounded-lg border border-amber-400/30">
+              <span className="text-amber-400 font-bold uppercase tracking-wider text-[10px]">Dev:</span>
+              <button
+                onClick={() => onSelectTab('restricted')}
+                className={`cursor-pointer hover:text-white ${activeTab === 'restricted' ? 'text-amber-300 font-bold' : 'text-slate-300'}`}
+              >
+                Restricted Screen
+              </button>
+              <button
+                onClick={() => onSelectTab('checkout')}
+                className={`cursor-pointer hover:text-white ${activeTab === 'checkout' ? 'text-amber-300 font-bold' : 'text-slate-300'}`}
+              >
+                Checkout {hasActiveOrder && '•'}
+              </button>
+              <button
+                onClick={() => onSelectTab('admin')}
+                className={`cursor-pointer hover:text-white ${activeTab === 'admin' ? 'text-amber-300 font-bold' : 'text-slate-300'}`}
+              >
+                Admin
+              </button>
+              <button
+                onClick={() => onSelectTab('applications')}
+                className={`cursor-pointer hover:text-white ${activeTab === 'applications' ? 'text-amber-300 font-bold' : 'text-slate-300'}`}
+              >
+                Sim Launcher
+              </button>
+            </nav>
           )}
         </div>
       </div>
-
-      {/* Mobile Nav strip (when navigation is visible) */}
-      {!hideNavigation && (
-        <div className="md:hidden flex items-center justify-around border-t border-[#0d4670] bg-[#00223b] px-2 py-2 text-xs overflow-x-auto">
-          <button
-            onClick={() => onSelectTab('checkout')}
-            className={`px-3 py-1 whitespace-nowrap shrink-0 cursor-pointer ${
-              activeTab === 'checkout' ? 'text-amber-400 font-bold' : 'text-slate-300'
-            }`}
-          >
-            Payment Hub {hasActiveOrder && '•'}
-          </button>
-          <button
-            onClick={() => onSelectTab('applications')}
-            className={`px-3 py-1 whitespace-nowrap shrink-0 cursor-pointer ${
-              activeTab === 'applications' ? 'text-amber-400 font-bold' : 'text-slate-300'
-            }`}
-          >
-            Applications
-          </button>
-          <button
-            onClick={() => onSelectTab('admin')}
-            className={`px-3 py-1 whitespace-nowrap shrink-0 flex items-center gap-1 cursor-pointer ${
-              activeTab === 'admin' ? 'text-amber-400 font-bold' : 'text-slate-300'
-            }`}
-          >
-            <Lock className="w-3 h-3 text-amber-400" />
-            Admin Console
-          </button>
-        </div>
-      )}
     </header>
   );
 };
