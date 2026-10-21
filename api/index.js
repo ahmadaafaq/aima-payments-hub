@@ -2221,6 +2221,20 @@ var ServerTransactionStore = class {
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   }
+  async fetchAll() {
+    try {
+      const { data, error } = await supabaseAdmin.from("aima_payment_transactions").select("*").order("created_at", { ascending: false });
+      if (!error && Array.isArray(data) && data.length > 0) {
+        for (const row of data) {
+          const txn = this.mapRowToTxn(row);
+          this.transactions.set(txn.id, txn);
+        }
+      }
+    } catch (err) {
+      console.warn("[TransactionStore] Supabase fetchAll notice:", err.message);
+    }
+    return this.getAll();
+  }
   getById(id) {
     return this.transactions.get(id);
   }
@@ -3115,9 +3129,10 @@ paymentRouter.get("/payments/status/:id", (req, res) => {
   }
   res.json({ transaction: txn });
 });
-paymentRouter.get("/transactions", (_req, res) => {
+paymentRouter.get("/transactions", async (_req, res) => {
+  const transactions = await serverTransactionStore.fetchAll();
   res.json({
-    transactions: serverTransactionStore.getAll()
+    transactions
   });
 });
 paymentRouter.post("/transactions/record-simulator", (req, res) => {
@@ -4057,11 +4072,11 @@ v1Router.delete("/admin/applications/:code", (req, res) => {
   }
   return res.json({ success: true, message: `Application '${code}' deleted successfully` });
 });
-v1Router.get("/admin/transactions", (req, res) => {
+v1Router.get("/admin/transactions", async (req, res) => {
   if (!adminAuth(req, res, () => {
   })) return;
   const { sourceCode, gateway, status, search, startDate, endDate } = req.query;
-  let txns = serverTransactionStore.getAll();
+  let txns = await serverTransactionStore.fetchAll();
   if (sourceCode && sourceCode !== "ALL") {
     const sc = String(sourceCode).toUpperCase();
     txns = txns.filter((t) => t.applicationCode.toUpperCase() === sc || t.applicationId && t.applicationId.toUpperCase() === sc);

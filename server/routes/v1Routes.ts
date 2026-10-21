@@ -971,11 +971,11 @@ v1Router.delete('/admin/applications/:code', (req: Request, res: Response): any 
 });
 
 /** GET /api/v1/admin/transactions — Comprehensive payment ledger and reporting */
-v1Router.get('/admin/transactions', (req: Request, res: Response): any => {
+v1Router.get('/admin/transactions', async (req: Request, res: Response): Promise<any> => {
   if (!adminAuth(req, res, () => {})) return;
 
   const { sourceCode, gateway, status, search, startDate, endDate } = req.query;
-  let txns = serverTransactionStore.getAll();
+  let txns = await serverTransactionStore.fetchAll();
 
   if (sourceCode && sourceCode !== 'ALL') {
     const sc = String(sourceCode).toUpperCase();

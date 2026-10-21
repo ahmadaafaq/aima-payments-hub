@@ -130,6 +130,32 @@ export default function App() {
     returnUrl?: string;
     orderId?: string;
   } | null>(null);
+  const [isAdminRefreshing, setIsAdminRefreshing] = useState<boolean>(false);
+
+  const refreshServerTransactions = async () => {
+    setIsAdminRefreshing(true);
+    try {
+      const res = await fetch('/api/transactions');
+      const data = await res.json();
+      if (Array.isArray(data?.transactions) && data.transactions.length > 0) {
+        setTransactions(data.transactions);
+        try {
+          localStorage.setItem('aima_payment_hub_transactions_v1', JSON.stringify(data.transactions));
+        } catch {}
+      }
+    } catch (err) {
+      console.warn('Could not refresh /api/transactions:', err);
+    } finally {
+      setIsAdminRefreshing(false);
+    }
+  };
+
+  // Re-fetch transactions whenever admin tab is viewed
+  useEffect(() => {
+    if (activeTab === 'admin') {
+      refreshServerTransactions();
+    }
+  }, [activeTab]);
 
   // Load initial stored transactions & gateway statuses on mount
   useEffect(() => {
@@ -158,6 +184,9 @@ export default function App() {
         if (Array.isArray(data?.transactions) && data.transactions.length > 0) {
           setTransactions(data.transactions);
           setLastTransaction(data.transactions[0]);
+          try {
+            localStorage.setItem('aima_payment_hub_transactions_v1', JSON.stringify(data.transactions));
+          } catch {}
         }
       })
       .catch(() => {
@@ -785,14 +814,9 @@ export default function App() {
             {adminSection === 'ledger' ? (
               <AdminDashboard
                 transactions={transactions}
-                onReconcileSuccess={() => {
-                  fetch('/api/transactions')
-                    .then((r) => r.json())
-                    .then((data) => {
-                      if (Array.isArray(data?.transactions)) setTransactions(data.transactions);
-                    })
-                    .catch(() => {});
-                }}
+                onRefresh={refreshServerTransactions}
+                isRefreshing={isAdminRefreshing}
+                onReconcileSuccess={refreshServerTransactions}
                 onViewReceipt={(txn) => {
                   setLastTransaction(txn);
                   setSelectedApp(

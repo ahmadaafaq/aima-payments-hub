@@ -23,6 +23,7 @@ import {
   ExternalLink,
   ShieldCheck,
   FileSpreadsheet,
+  RotateCw,
   X
 } from 'lucide-react';
 
@@ -32,6 +33,8 @@ interface AdminDashboardProps {
   onViewReceipt: (transaction: TransactionRecord) => void;
   onViewSync?: (transaction: TransactionRecord) => void;
   onReconcileSuccess?: () => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -40,6 +43,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onViewReceipt,
   onViewSync,
   onReconcileSuccess,
+  onRefresh,
+  isRefreshing,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGateway, setSelectedGateway] = useState<string>('ALL');
@@ -309,6 +314,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              title="Refresh ledger from Supabase"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-lg border border-slate-300 shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+            >
+              <RotateCw className={`w-3.5 h-3.5 text-slate-600 ${isRefreshing ? 'animate-spin text-[#002b49]' : ''}`} />
+              <span>{isRefreshing ? 'Refreshing...' : 'Refresh Ledger'}</span>
+            </button>
+          )}
           <button
             onClick={handleExportCSV}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-lg border border-slate-300 shadow-xs cursor-pointer transition-colors"

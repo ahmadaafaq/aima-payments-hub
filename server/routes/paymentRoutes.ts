@@ -683,11 +683,12 @@ paymentRouter.get('/payments/status/:id', (req: Request, res: Response): any => 
 
 /**
  * 8. GET /api/transactions
- * Returns list of persistent transactions
+ * Returns list of persistent transactions synced with Supabase
  */
-paymentRouter.get('/transactions', (_req: Request, res: Response) => {
+paymentRouter.get('/transactions', async (_req: Request, res: Response) => {
+  const transactions = await serverTransactionStore.fetchAll();
   res.json({
-    transactions: serverTransactionStore.getAll(),
+    transactions,
   });
 });
 

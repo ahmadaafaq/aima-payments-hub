@@ -248,6 +248,25 @@ export class ServerTransactionStore {
     );
   }
 
+  public async fetchAll(): Promise<ServerTransaction[]> {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('aima_payment_transactions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        for (const row of data) {
+          const txn = this.mapRowToTxn(row);
+          this.transactions.set(txn.id, txn);
+        }
+      }
+    } catch (err: any) {
+      console.warn('[TransactionStore] Supabase fetchAll notice:', err.message);
+    }
+    return this.getAll();
+  }
+
   public getById(id: string): ServerTransaction | undefined {
     return this.transactions.get(id);
   }
