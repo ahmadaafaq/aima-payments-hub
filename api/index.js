@@ -2234,7 +2234,7 @@ var ServerTransactionStore = class {
     const existing = this.getBySessionToken(token);
     if (existing) return existing;
     try {
-      const { data, error } = await supabaseAdmin.from("aima_payment_transactions").select("*").eq("session_token", token).single();
+      const { data, error } = await supabaseAdmin.from("aima_payment_transactions").select("*").eq("session_token", token).maybeSingle();
       if (!error && data) {
         const txn = {
           id: data.id,
@@ -2289,10 +2289,10 @@ var ServerTransactionStore = class {
       (t) => t.applicationCode === sourceCode.toUpperCase()
     );
   }
-  save(transaction) {
+  async save(transaction) {
     this.transactions.set(transaction.id, transaction);
     this.persistToDisk();
-    this.upsertToSupabase(transaction);
+    await this.upsertToSupabase(transaction);
     return transaction;
   }
   isCallbackProcessed(idempotencyKey) {
@@ -3232,7 +3232,7 @@ function resolveCheckoutUrl(req, sessionToken) {
   }
   return `https://aima-payments-hub.vercel.app/checkout/${sessionToken}`;
 }
-function handleCommonPay(req, res) {
+async function handleCommonPay(req, res) {
   const sourceCode = (req.query.source || req.query.app || req.query.project_code || "").trim();
   const reference = (req.query.reference || req.query.ref || req.query.applicationRef || "").trim();
   const amountStr = (req.query.amount || "").trim();
@@ -3422,7 +3422,7 @@ function handleCommonPay(req, res) {
   transaction.returnUrl = returnUrl;
   transaction.externalOrderId = reference || orderId;
   transaction.paymentPurpose = paymentPurpose;
-  serverTransactionStore.save(transaction);
+  await serverTransactionStore.save(transaction);
   const checkoutUrl = resolveCheckoutUrl(req, session.sessionToken);
   if (isJson) {
     return res.status(201).json({
@@ -3443,7 +3443,7 @@ function handleCommonPay(req, res) {
   return res.redirect(checkoutUrl);
 }
 v1Router.get("/pay", handleCommonPay);
-v1Router.post("/payment-sessions", hmacAuthMiddleware, (req, res) => {
+v1Router.post("/payment-sessions", hmacAuthMiddleware, async (req, res) => {
   const sourceApp = req.sourceApp;
   if (!sourceApp) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -3604,7 +3604,7 @@ v1Router.post("/payment-sessions", hmacAuthMiddleware, (req, res) => {
   transaction.returnUrl = returnUrl;
   transaction.externalOrderId = externalOrderId;
   transaction.paymentPurpose = paymentPurpose;
-  serverTransactionStore.save(transaction);
+  await serverTransactionStore.save(transaction);
   const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
   const checkoutUrl = `${appUrl}/checkout/${session.sessionToken}`;
   return res.status(201).json({
@@ -3656,7 +3656,11 @@ v1Router.get("/session/:token", async (req, res) => {
   const token = req.params.token;
   let session = paymentSessionStore.getByToken(token);
   if (!session) {
-    const storedTxn = await serverTransactionStore.fetchBySessionToken(token);
+    let storedTxn = await serverTransactionStore.fetchBySessionToken(token);
+    if (!storedTxn) {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      storedTxn = await serverTransactionStore.fetchBySessionToken(token);
+    }
     if (storedTxn) {
       const app3 = sourceApplicationRegistry.getBySourceCode(storedTxn.applicationCode);
       session = paymentSessionStore.createWithToken({

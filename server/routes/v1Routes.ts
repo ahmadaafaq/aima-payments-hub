@@ -112,7 +112,7 @@ function resolveCheckoutUrl(req: Request, sessionToken: string): string {
  * Common payment initiation endpoint for source application redirects:
  * E.g.: https://payments.aima.in/pay?source=AMIACRC&reference=REG123&amount=1000&currency=INR&gateway=CCAVENUE&return_url=...
  */
-export function handleCommonPay(req: Request, res: Response): any {
+export async function handleCommonPay(req: Request, res: Response): Promise<any> {
   const sourceCode = ((req.query.source || req.query.app || req.query.project_code || '') as string).trim();
   const reference = ((req.query.reference || req.query.ref || req.query.applicationRef || '') as string).trim();
   const amountStr = ((req.query.amount || '') as string).trim();
@@ -335,7 +335,7 @@ export function handleCommonPay(req: Request, res: Response): any {
   transaction.returnUrl = returnUrl;
   transaction.externalOrderId = reference || orderId;
   transaction.paymentPurpose = paymentPurpose;
-  serverTransactionStore.save(transaction);
+  await serverTransactionStore.save(transaction);
 
   const checkoutUrl = resolveCheckoutUrl(req, session.sessionToken);
 
@@ -374,7 +374,7 @@ v1Router.get('/pay', handleCommonPay);
  *     never trusts client to override registry policy.
  *   - Validates gateway sandbox readiness.
  */
-v1Router.post('/payment-sessions', hmacAuthMiddleware, (req: Request, res: Response): any => {
+v1Router.post('/payment-sessions', hmacAuthMiddleware, async (req: Request, res: Response): Promise<any> => {
   const sourceApp: SourceApplication = (req as any).sourceApp;
   if (!sourceApp) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -562,7 +562,7 @@ v1Router.post('/payment-sessions', hmacAuthMiddleware, (req: Request, res: Respo
   transaction.returnUrl = returnUrl;
   transaction.externalOrderId = externalOrderId;
   transaction.paymentPurpose = paymentPurpose;
-  serverTransactionStore.save(transaction);
+  await serverTransactionStore.save(transaction);
 
   const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
   const checkoutUrl = `${appUrl}/checkout/${session.sessionToken}`;
@@ -640,7 +640,11 @@ v1Router.get('/session/:token', async (req: Request, res: Response): Promise<any
   let session = paymentSessionStore.getByToken(token);
 
   if (!session) {
-    const storedTxn = await serverTransactionStore.fetchBySessionToken(token);
+    let storedTxn = await serverTransactionStore.fetchBySessionToken(token);
+    if (!storedTxn) {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      storedTxn = await serverTransactionStore.fetchBySessionToken(token);
+    }
     if (storedTxn) {
       const app = sourceApplicationRegistry.getBySourceCode(storedTxn.applicationCode);
       session = paymentSessionStore.createWithToken({

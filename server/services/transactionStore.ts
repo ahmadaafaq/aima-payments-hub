@@ -268,7 +268,7 @@ export class ServerTransactionStore {
         .from('aima_payment_transactions')
         .select('*')
         .eq('session_token', token)
-        .single();
+        .maybeSingle();
       if (!error && data) {
         const txn: ServerTransaction = {
           id: data.id,
@@ -326,10 +326,10 @@ export class ServerTransactionStore {
     );
   }
 
-  public save(transaction: ServerTransaction): ServerTransaction {
+  public async save(transaction: ServerTransaction): Promise<ServerTransaction> {
     this.transactions.set(transaction.id, transaction);
     this.persistToDisk();
-    this.upsertToSupabase(transaction);
+    await this.upsertToSupabase(transaction);
     return transaction;
   }
 
