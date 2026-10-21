@@ -95,6 +95,15 @@ function renderErrorHtml(title: string, message: string, details?: string): stri
 </html>`;
 }
 
+function resolveCheckoutUrl(req: Request, sessionToken: string): string {
+  if (process.env.APP_URL) {
+    return `${process.env.APP_URL.replace(/\/$/, '')}/checkout/${sessionToken}`;
+  }
+  const host = (req.headers['x-forwarded-host'] as string) || req.get('host') || 'aima-payments-hub.vercel.app';
+  const proto = host.includes('localhost') || host.includes('127.0.0.1') ? (req.protocol || 'http') : 'https';
+  return `${proto}://${host}/checkout/${sessionToken}`;
+}
+
 // ─── Common Payment Initiation URL Handler (/pay) ─────────────────────────────
 /**
  * Common payment initiation endpoint for source application redirects:
@@ -240,8 +249,7 @@ export function handleCommonPay(req: Request, res: Response): any {
     // Reuse existing active pending session if candidate clicks /pay again before 15 min expires
     const activeSession = paymentSessionStore.findActivePending(sourceApp.sourceCode, reference);
     if (activeSession) {
-      const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-      const checkoutUrl = `${appUrl}/checkout/${activeSession.sessionToken}`;
+      const checkoutUrl = resolveCheckoutUrl(req, activeSession.sessionToken);
       if (isJson) {
         return res.status(200).json({
           success: true,
@@ -322,8 +330,7 @@ export function handleCommonPay(req: Request, res: Response): any {
     idempotencyKey: transaction.idempotencyKey,
   });
 
-  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-  const checkoutUrl = `${appUrl}/checkout/${session.sessionToken}`;
+  const checkoutUrl = resolveCheckoutUrl(req, session.sessionToken);
 
   if (isJson) {
     return res.status(201).json({

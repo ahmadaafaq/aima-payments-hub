@@ -3135,6 +3135,14 @@ function renderErrorHtml(title, message, details) {
 </body>
 </html>`;
 }
+function resolveCheckoutUrl(req, sessionToken) {
+  if (process.env.APP_URL) {
+    return `${process.env.APP_URL.replace(/\/$/, "")}/checkout/${sessionToken}`;
+  }
+  const host = req.headers["x-forwarded-host"] || req.get("host") || "aima-payments-hub.vercel.app";
+  const proto = host.includes("localhost") || host.includes("127.0.0.1") ? req.protocol || "http" : "https";
+  return `${proto}://${host}/checkout/${sessionToken}`;
+}
 function handleCommonPay(req, res) {
   const sourceCode = (req.query.source || req.query.app || req.query.project_code || "").trim();
   const reference = (req.query.reference || req.query.ref || req.query.applicationRef || "").trim();
@@ -3248,8 +3256,7 @@ function handleCommonPay(req, res) {
     }
     const activeSession = paymentSessionStore.findActivePending(sourceApp.sourceCode, reference);
     if (activeSession) {
-      const appUrl2 = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
-      const checkoutUrl2 = `${appUrl2}/checkout/${activeSession.sessionToken}`;
+      const checkoutUrl2 = resolveCheckoutUrl(req, activeSession.sessionToken);
       if (isJson) {
         return res.status(200).json({
           success: true,
@@ -3323,8 +3330,7 @@ function handleCommonPay(req, res) {
     routingMode: gatewayResolution.routingMode,
     idempotencyKey: transaction.idempotencyKey
   });
-  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
-  const checkoutUrl = `${appUrl}/checkout/${session.sessionToken}`;
+  const checkoutUrl = resolveCheckoutUrl(req, session.sessionToken);
   if (isJson) {
     return res.status(201).json({
       success: true,
