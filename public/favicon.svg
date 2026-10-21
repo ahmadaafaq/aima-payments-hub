@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="aimaBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#003860" />
+      <stop offset="50%" stop-color="#002b49" />
+      <stop offset="100%" stop-color="#001a2c" />
+    </linearGradient>
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+    <linearGradient id="tricolorAccent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="50%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+    <filter id="subtleShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Background Base Container -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#aimaBlue)" stroke="#0a4b78" stroke-width="1.5" filter="url(#subtleShadow)" />
+
+  <!-- Tricolor Top Ribbon Accent -->
+  <path d="M 12 4 L 52 4 Q 60 4 60 12 L 60 7 Q 60 2 52 2 L 12 2 Q 4 2 4 7 L 4 12 Q 4 4 12 4 Z" fill="url(#tricolorAccent)" opacity="0.9" />
+
+  <!-- Outer Border Glow -->
+  <rect x="4" y="4" width="56" height="56" rx="12" fill="none" stroke="url(#goldGradient)" stroke-width="1" stroke-opacity="0.4" />
+
+  <!-- Central Security Shield / Lock Accent -->
+  <path d="M32 10 L41 14 C41 23 32 30 32 32 C32 30 23 23 23 14 Z" fill="url(#goldGradient)" opacity="0.3" />
+  
+  <!-- Mini Lock Shackle & Body -->
+  <path d="M29 16 C29 14.3 30.3 13 32 13 C33.7 13 35 14.3 35 16 L35 18 L29 18 Z" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round" />
+  <rect x="27.5" y="17.5" width="9" height="7" rx="2" fill="url(#goldGradient)" />
+  <circle cx="32" cy="20.5" r="1" fill="#002b49" />
+
+  <!-- Core Brand Typography: AIMA -->
+  <text x="32" y="38" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Plus Jakarta Sans', sans-serif" font-weight="900" font-size="12.5" letter-spacing="1.2" fill="#ffffff">
+    AIMA
+  </text>
+
+  <!-- Institutional PAY Capsule Badge -->
+  <rect x="18" y="43" width="28" height="11" rx="5.5" fill="url(#goldGradient)" />
+  <text x="32" y="51.2" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="7" letter-spacing="1" fill="#002b49">
+    PAY
+  </text>
+</svg>
