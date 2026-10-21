@@ -700,12 +700,12 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setSessionError(null);
-                        setActiveTab('applications');
+                        const fallbackUrl = sessionReturnUrl || document.referrer || 'https://research.aima.in';
+                        window.location.href = fallbackUrl;
                       }}
                       className="w-full py-3.5 px-4 rounded-xl font-bold text-xs bg-[#002b49] hover:bg-[#003860] text-white transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <span>Return to Applications</span>
+                      <span>Return to Originating Application</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   )}
@@ -722,7 +722,10 @@ export default function App() {
                 expiresAt={sessionExpiresAt || undefined}
                 onSelectGateway={setSelectedGateway}
                 onProceedToPay={handleProceedToPay}
-                onBackToApps={() => setActiveTab('applications')}
+                onBackToApps={() => {
+                  const fallbackUrl = sessionReturnUrl || document.referrer || 'https://research.aima.in';
+                  window.location.href = fallbackUrl;
+                }}
               />
             ) : (
               currentTxnForDisplay && (

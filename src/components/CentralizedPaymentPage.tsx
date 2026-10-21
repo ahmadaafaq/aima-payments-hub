@@ -141,7 +141,7 @@ export const CentralizedPaymentPage: React.FC<CentralizedPaymentPageProps> = ({
             className="inline-flex items-center gap-1.5 text-slate-600 hover:text-[#002b49] font-semibold cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to Applications</span>
+            <span>Return to {application?.name || 'Application'}</span>
           </button>
         )}
 
