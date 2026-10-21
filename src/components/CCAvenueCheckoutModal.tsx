@@ -46,7 +46,8 @@ export const CCAvenueCheckoutModal: React.FC<CCAvenueCheckoutModalProps> = ({
 
   if (!isOpen) return null;
 
-  const testAmount = transaction.gatewayAmount ? transaction.gatewayAmount.toFixed(2) : '2.00';
+  const payableAmount = transaction.gatewayAmount ? transaction.gatewayAmount.toFixed(2) : transaction.totalAmount.toFixed(2);
+  const testAmount = payableAmount;
   const merchantId = checkoutPayload?.merchantId || '4168947';
   const tid = checkoutPayload?.tid || '76098022';
   const accessCode = checkoutPayload?.accessCode || 'AVXO66MD08BH79OXHB';
@@ -107,7 +108,7 @@ export const CCAvenueCheckoutModal: React.FC<CCAvenueCheckoutModalProps> = ({
             <span className="px-1.5 py-0.5 rounded bg-blue-700 text-white text-[10px] uppercase font-mono font-extrabold tracking-wider">
               HDFC CCAVENUE
             </span>
-            <span>Live Kit Integration & Test Gateway</span>
+            <span>Official Payment Gateway</span>
           </div>
           <button
             onClick={onClose}
@@ -123,24 +124,18 @@ export const CCAvenueCheckoutModal: React.FC<CCAvenueCheckoutModalProps> = ({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-extrabold text-base tracking-tight text-white">HDFC Bank / CCAvenue</span>
-              <span className="text-[10px] font-mono text-amber-300 bg-black/30 px-1.5 py-0.5 rounded">
-                Acct ID: {merchantId}
-              </span>
             </div>
             <p className="text-[11px] text-slate-300 mt-1">
-              TID: <strong className="font-mono text-white">{tid}</strong> · ME: <strong className="font-mono text-white">GPY451</strong> · Order: <strong className="font-mono text-white">{transaction.orderId}</strong>
+              Order ID: <strong className="font-mono text-white">{transaction.orderId}</strong>
             </p>
           </div>
 
           <div className="text-right shrink-0">
             <span className="block text-[10px] text-amber-300 font-semibold uppercase">
-              Test Charge
+              Total Amount
             </span>
             <span className="text-2xl font-extrabold text-amber-300 font-mono tabular-nums">
-              ₹{testAmount}
-            </span>
-            <span className="block text-[10px] text-slate-300">
-              (Nominal: {formatINR(transaction.totalAmount)})
+              ₹{payableAmount}
             </span>
           </div>
         </div>
@@ -158,15 +153,11 @@ export const CCAvenueCheckoutModal: React.FC<CCAvenueCheckoutModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-6 space-y-5 text-xs">
-          {/* HDFC Instruction Box */}
-          <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200 text-blue-950 text-[11px] leading-relaxed space-y-1">
-            <div className="flex items-center gap-1.5 font-bold text-blue-900">
-              <ShieldCheck className="w-4 h-4 text-blue-700" />
-              <span>HDFC Bank Live Kit Verification (AIMA Account 4168947)</span>
-            </div>
-            <p className="text-slate-600">
-              Per HDFC Bank onboarding instructions: <em>"Kindly perform a test transaction using live credentials for Card as well as Net Banking payment option"</em>.
-            </p>
+          <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200 text-blue-950 text-[11px] leading-relaxed flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-blue-700 shrink-0" />
+            <span className="text-slate-700">
+              Secure 256-Bit SSL connection with HDFC Bank & CCAvenue Payment Gateway.
+            </span>
           </div>
 
           {/* Payment Rail Tabs */}
@@ -283,7 +274,7 @@ export const CCAvenueCheckoutModal: React.FC<CCAvenueCheckoutModalProps> = ({
                   className="w-full py-2.5 px-3 bg-[#002b49] hover:bg-[#003860] text-white font-bold rounded-lg shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Authorize HDFC Test Transaction (₹{testAmount})</span>
+                  <span>Proceed to Pay ₹{payableAmount}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -370,7 +361,10 @@ export const CCAvenueCheckoutModal: React.FC<CCAvenueCheckoutModalProps> = ({
 
         {/* Modal Footer */}
         <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
-          <span className="font-mono">Account ID: 4168947 · TID: 76098022</span>
+          <span className="flex items-center gap-1 font-medium text-slate-600">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            PCI-DSS Level 1 · 256-Bit SSL Encrypted
+          </span>
           <button
             onClick={onClose}
             className="text-slate-700 hover:text-slate-900 font-semibold cursor-pointer"

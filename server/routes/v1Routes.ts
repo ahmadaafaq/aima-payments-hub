@@ -18,11 +18,13 @@ import { serverTransactionStore } from '../services/transactionStore';
 import { GatewayType, ServerTransaction } from '../gateways/gatewayTypes';
 import { WorldlinePaynimoAdapter } from '../gateways/worldlinePaynimo';
 import { CCAvenueAdapter } from '../gateways/ccavenue';
+import { HDFCCollectNowAdapter } from '../gateways/hdfcCollectNow';
 
 export const v1Router = Router();
 
 const worldlineAdapter = new WorldlinePaynimoAdapter();
 const ccavenueAdapter = new CCAvenueAdapter();
+const hdfcCollectNowAdapter = new HDFCCollectNowAdapter();
 
 // ─── Admin Token Auth ─────────────────────────────────────────────────────────
 function adminAuth(req: Request, res: Response, next: () => void): boolean {
@@ -172,11 +174,12 @@ export function handleCommonPay(req: Request, res: Response): any {
 
   // 5. Check gateway configuration: NEVER silently fall back to simulated success
   if (resolvedGateway === 'CCAVENUE') {
-    const status = ccavenueAdapter.getStatus();
+    const collectNowStatus = hdfcCollectNowAdapter.getStatus();
+    const status = collectNowStatus.canProcessLiveSandbox ? collectNowStatus : ccavenueAdapter.getStatus();
     if (!status.canProcessLiveSandbox) {
       const err = {
         error: 'GATEWAY_CONFIG_ERROR',
-        message: 'Gateway Configuration Error: HDFC / CCAvenue sandbox credentials are not configured. Cannot process payments without active test keys. Falling back to simulator is strictly prohibited.',
+        message: 'Gateway Configuration Error: HDFC Bank sandbox credentials are not configured. Cannot process payments without active test keys. Falling back to simulator is strictly prohibited.',
         gateway: 'CCAVENUE',
         blockerDetails: status.blockerDetails,
       };
@@ -191,6 +194,69 @@ export function handleCommonPay(req: Request, res: Response): any {
         gateway: 'WORLDLINE_PAYNIMO',
       };
       return isJson ? res.status(422).json(err) : res.status(422).send(renderErrorHtml('Gateway Configuration Error', err.message));
+    }
+  }
+
+  // 5b. Reference Idempotency & Duplicate Payment Prevention
+  if (reference) {
+    const existingSuccess = serverTransactionStore.getAll().find(
+      (t) =>
+        t.applicationCode === sourceApp.sourceCode &&
+        t.applicationRef === reference &&
+        t.status === 'SUCCESS'
+    );
+
+    if (existingSuccess) {
+      if (isJson) {
+        return res.status(200).json({
+          success: true,
+          alreadyPaid: true,
+          message: `Payment for reference '${reference}' has already been completed successfully.`,
+          orderId: existingSuccess.orderId,
+          transactionId: existingSuccess.id,
+          amountPaise: Math.round(existingSuccess.totalAmount * 100),
+          status: 'SUCCESS',
+        });
+      }
+
+      // If user came via browser redirect to /pay:
+      // Redirect back to return_url with status=SUCCESS&already_paid=true to prevent double charging
+      try {
+        const urlObj = new URL(returnUrl);
+        urlObj.searchParams.set('orderId', existingSuccess.orderId);
+        urlObj.searchParams.set('transactionId', existingSuccess.id);
+        urlObj.searchParams.set('status', 'SUCCESS');
+        urlObj.searchParams.set('reference', reference);
+        urlObj.searchParams.set('already_paid', 'true');
+        return res.redirect(urlObj.toString());
+      } catch {
+        const sep = returnUrl.includes('?') ? '&' : '?';
+        return res.redirect(
+          `${returnUrl}${sep}orderId=${encodeURIComponent(existingSuccess.orderId)}&transactionId=${encodeURIComponent(existingSuccess.id)}&status=SUCCESS&reference=${encodeURIComponent(reference)}&already_paid=true`
+        );
+      }
+    }
+
+    // Reuse existing active pending session if candidate clicks /pay again before 15 min expires
+    const activeSession = paymentSessionStore.findActivePending(sourceApp.sourceCode, reference);
+    if (activeSession) {
+      const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+      const checkoutUrl = `${appUrl}/checkout/${activeSession.sessionToken}`;
+      if (isJson) {
+        return res.status(200).json({
+          success: true,
+          reused: true,
+          sessionToken: activeSession.sessionToken,
+          checkoutUrl,
+          orderId: activeSession.orderId,
+          reference,
+          amountPaise: activeSession.amountPaise,
+          currency: 'INR',
+          resolvedGateway,
+          expiresAt: activeSession.expiresAt,
+        });
+      }
+      return res.redirect(checkoutUrl);
     }
   }
 
@@ -216,7 +282,7 @@ export function handleCommonPay(req: Request, res: Response): any {
     baseAmount: amountNum,
     gstAmount: 0,
     totalAmount: amountNum,
-    gatewayAmount: 2.0, // Sandbox test amount
+    gatewayAmount: amountNum,
     currency: 'INR',
     gateway: resolvedGateway,
     gatewayEnvironment: 'sandbox',
@@ -377,11 +443,12 @@ v1Router.post('/payment-sessions', hmacAuthMiddleware, (req: Request, res: Respo
 
   // ── Gateway configuration check (refuse silent fallback to simulator) ─────
   if (resolvedGateway === 'CCAVENUE') {
-    const status = ccavenueAdapter.getStatus();
+    const collectNowStatus = hdfcCollectNowAdapter.getStatus();
+    const status = collectNowStatus.canProcessLiveSandbox ? collectNowStatus : ccavenueAdapter.getStatus();
     if (!status.canProcessLiveSandbox) {
       return res.status(422).json({
         error: 'GATEWAY_CONFIG_ERROR',
-        message: 'Gateway Configuration Error: HDFC / CCAvenue sandbox credentials are not configured. Cannot process payments without active test keys. Falling back to simulator is strictly prohibited.',
+        message: 'Gateway Configuration Error: HDFC Bank sandbox credentials are not configured. Cannot process payments without active test keys. Falling back to simulator is strictly prohibited.',
         gateway: 'CCAVENUE',
         blockerDetails: status.blockerDetails,
       });
@@ -416,7 +483,7 @@ v1Router.post('/payment-sessions', hmacAuthMiddleware, (req: Request, res: Respo
   const txnId = `TXN-${dateStr}-${randNum}`;
   const orderId = `ORD-AIMA-${sourceApp.sourceCode.replace(/[^A-Za-z0-9]/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-  const gatewayAmount = 2.0; // Sandbox: always scale to ₹2 for test gateways
+  const gatewayAmount = amount.value;
 
   const transaction: ServerTransaction = {
     id: txnId,
@@ -551,9 +618,28 @@ v1Router.get('/payments/:orderId', hmacAuthMiddleware, (req: Request, res: Respo
  * Returns session details + order details + auto-resolved gateway.
  */
 v1Router.get('/session/:token', (req: Request, res: Response): any => {
-  const session = paymentSessionStore.getByToken(req.params.token);
+  const token = req.params.token;
+  const session = paymentSessionStore.getByToken(token);
 
   if (!session) {
+    const expiredSession = paymentSessionStore.getAnyByToken(token);
+    if (expiredSession) {
+      const app = sourceApplicationRegistry.getBySourceCode(expiredSession.sourceCode);
+      return res.status(410).json({
+        error: 'SESSION_EXPIRED',
+        message: 'This payment session has expired. Please return to the originating application to initiate a new checkout.',
+        session: {
+          sessionToken: expiredSession.sessionToken,
+          status: 'EXPIRED',
+          orderId: expiredSession.orderId,
+          sourceCode: expiredSession.sourceCode,
+          sourceName: app?.name || expiredSession.sourceCode,
+          returnUrl: expiredSession.returnUrl,
+          isExpired: true,
+        },
+      });
+    }
+
     return res.status(404).json({
       error: 'SESSION_NOT_FOUND',
       message: 'Payment session not found or has expired. Please return to the application and try again.',
@@ -563,6 +649,12 @@ v1Router.get('/session/:token', (req: Request, res: Response): any => {
   const txn = serverTransactionStore.getByOrderId(session.orderId);
   const app = sourceApplicationRegistry.getBySourceCode(session.sourceCode);
 
+  // If transaction is already successful, ensure session is completed
+  if (txn && txn.status === 'SUCCESS' && session.status !== 'COMPLETED') {
+    paymentSessionStore.markCompleted(session.sessionToken);
+  }
+
+  const isCompleted = session.status === 'COMPLETED' || txn?.status === 'SUCCESS';
   const resolvedGateway = session.selectedGateway || app?.assignedGateway || 'CCAVENUE';
   const routingMode = session.routingMode || app?.routingMode || 'AUTO';
 
@@ -576,6 +668,8 @@ v1Router.get('/session/:token', (req: Request, res: Response): any => {
       department: app?.department || 'CME',
       resolvedGateway,
       routingMode,
+      returnUrl: session.returnUrl,
+      isCompleted,
     },
     order: {
       orderId: session.orderId,
@@ -587,9 +681,10 @@ v1Router.get('/session/:token', (req: Request, res: Response): any => {
       currency: session.currency,
       customerName: session.customerName,
       customerEmail: session.customerEmail,
-      status: txn?.status || 'PENDING',
+      status: txn?.status || session.status,
       gateway: resolvedGateway,
     },
+    transaction: txn || null,
     allowedGateways: app?.allowedGateways || [resolvedGateway],
   });
 });
@@ -631,6 +726,35 @@ v1Router.put('/admin/applications/:code/gateway', (req: Request, res: Response):
     return res.json({
       success: true,
       message: `Gateway assignment for ${app.sourceCode} updated to ${app.assignedGateway} (${app.routingMode})`,
+      application: sourceApplicationRegistry.toSafeView(app),
+    });
+  } catch (err: any) {
+    return res.status(404).json({ error: err.message });
+  }
+});
+
+/** PUT /api/v1/admin/applications/:code — Update full platform configuration (gateway, return URLs, notification webhook, name) */
+v1Router.put('/admin/applications/:code', (req: Request, res: Response): any => {
+  if (!adminAuth(req, res, () => {})) return;
+
+  const { name, assignedGateway, allowedReturnUrls, notificationUrl, department } = req.body;
+  const normalizedGw = assignedGateway ? sourceApplicationRegistry.normalizeGatewayName(assignedGateway) : undefined;
+
+  try {
+    const app = sourceApplicationRegistry.updateApplication(
+      req.params.code,
+      {
+        name,
+        assignedGateway: normalizedGw || undefined,
+        allowedReturnUrls,
+        notificationUrl,
+        department,
+      },
+      'ADMIN_API'
+    );
+    return res.json({
+      success: true,
+      message: `Platform '${app.sourceCode}' configuration updated successfully`,
       application: sourceApplicationRegistry.toSafeView(app),
     });
   } catch (err: any) {
@@ -786,9 +910,157 @@ v1Router.post('/admin/notifications/:eventId/retry', (req: Request, res: Respons
   }
 });
 
-/** GET /api/v1/admin/sessions — List payment sessions (admin) */
-v1Router.get('/admin/sessions', (req: Request, res: Response): any => {
+/** DELETE /api/v1/admin/applications/:code — Delete a source application */
+v1Router.delete('/admin/applications/:code', (req: Request, res: Response): any => {
   if (!adminAuth(req, res, () => {})) return;
-  const sessions = paymentSessionStore.getAll();
-  return res.json({ sessions, total: sessions.length });
+
+  const code = req.params.code;
+  const deleted = sourceApplicationRegistry.deleteApplication(code, 'ADMIN_API');
+  if (!deleted) {
+    return res.status(404).json({ error: `Application '${code}' not found` });
+  }
+
+  return res.json({ success: true, message: `Application '${code}' deleted successfully` });
 });
+
+/** GET /api/v1/admin/transactions — Comprehensive payment ledger and reporting */
+v1Router.get('/admin/transactions', (req: Request, res: Response): any => {
+  if (!adminAuth(req, res, () => {})) return;
+
+  const { sourceCode, gateway, status, search, startDate, endDate } = req.query;
+  let txns = serverTransactionStore.getAll();
+
+  if (sourceCode && sourceCode !== 'ALL') {
+    const sc = String(sourceCode).toUpperCase();
+    txns = txns.filter((t) => t.applicationCode.toUpperCase() === sc || (t.applicationId && t.applicationId.toUpperCase() === sc));
+  }
+
+  if (gateway && gateway !== 'ALL') {
+    const gw = String(gateway).toUpperCase();
+    txns = txns.filter((t) => t.gateway.toUpperCase() === gw);
+  }
+
+  if (status && status !== 'ALL') {
+    const st = String(status).toUpperCase();
+    txns = txns.filter((t) => t.status.toUpperCase() === st);
+  }
+
+  if (startDate) {
+    const start = new Date(String(startDate)).getTime();
+    if (!isNaN(start)) {
+      txns = txns.filter((t) => new Date(t.createdAt).getTime() >= start);
+    }
+  }
+
+  if (endDate) {
+    const end = new Date(String(endDate)).getTime();
+    if (!isNaN(end)) {
+      txns = txns.filter((t) => new Date(t.createdAt).getTime() <= end);
+    }
+  }
+
+  if (search) {
+    const q = String(search).toLowerCase().trim();
+    txns = txns.filter(
+      (t) =>
+        t.orderId.toLowerCase().includes(q) ||
+        t.applicantName.toLowerCase().includes(q) ||
+        t.applicantEmail.toLowerCase().includes(q) ||
+        (t.bankReference && t.bankReference.toLowerCase().includes(q)) ||
+        (t.gatewayTransactionId && t.gatewayTransactionId.toLowerCase().includes(q)) ||
+        t.applicationName.toLowerCase().includes(q)
+    );
+  }
+
+  // Calculate aggregation metrics
+  const totalCount = txns.length;
+  const successList = txns.filter((t) => t.status === 'SUCCESS');
+  const failedList = txns.filter((t) => t.status === 'FAILED');
+  const pendingList = txns.filter((t) => t.status === 'PENDING');
+  const totalAmount = successList.reduce((acc, t) => acc + (t.totalAmount || 0), 0);
+
+  return res.json({
+    transactions: txns,
+    total: totalCount,
+    metrics: {
+      totalCount,
+      successCount: successList.length,
+      failedCount: failedList.length,
+      pendingCount: pendingList.length,
+      totalAmount,
+      successRate: totalCount > 0 ? ((successList.length / totalCount) * 100).toFixed(1) : '0',
+    },
+  });
+});
+
+/** POST /api/v1/admin/transactions/:id/reconcile — Admin conflict/discrepancy resolution */
+v1Router.post('/admin/transactions/:id/reconcile', (req: Request, res: Response): any => {
+  if (!adminAuth(req, res, () => {})) return;
+
+  const { status, note, bankReference, adminUser } = req.body;
+  if (!status || !['SUCCESS', 'FAILED', 'CANCELLED'].includes(status)) {
+    return res.status(400).json({ error: "Invalid status. Must be SUCCESS, FAILED, or CANCELLED." });
+  }
+
+  if (!note) {
+    return res.status(400).json({ error: "Resolution note is required." });
+  }
+
+  try {
+    const resolved = serverTransactionStore.reconcileTransaction(req.params.id, {
+      status,
+      note,
+      adminUser: adminUser || 'Admin User',
+      bankReference,
+    });
+    return res.json({ success: true, transaction: resolved });
+  } catch (err: any) {
+    return res.status(404).json({ error: err.message });
+  }
+});
+
+/** POST /api/v1/admin/auth/login — Admin login */
+v1Router.post('/admin/auth/login', (req: Request, res: Response): any => {
+  const { username, password } = req.body;
+  const adminToken = process.env.ADMIN_TOKEN || 'aima-admin-dev-token-2026';
+  const expectedPassword = process.env.ADMIN_PASSWORD || 'AimaAdmin@2026';
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+
+  // Accept admin / AimaAdmin@2026 or aima / AimaAdmin@2026
+  if (
+    (username.toLowerCase() === 'admin' || username.toLowerCase() === 'tech@aima.in') &&
+    password === expectedPassword
+  ) {
+    return res.json({
+      success: true,
+      token: adminToken,
+      user: {
+        username: 'admin',
+        email: 'tech@aima.in',
+        name: 'AIMA Payments Administrator',
+        role: 'superadmin',
+      },
+    });
+  }
+
+  return res.status(401).json({ error: 'Invalid admin credentials' });
+});
+
+/** GET /api/v1/admin/auth/verify — Verify admin session */
+v1Router.get('/admin/auth/verify', (req: Request, res: Response): any => {
+  if (!adminAuth(req, res, () => {})) return;
+
+  return res.json({
+    valid: true,
+    user: {
+      username: 'admin',
+      email: 'tech@aima.in',
+      name: 'AIMA Payments Administrator',
+      role: 'superadmin',
+    },
+  });
+});
+

@@ -1,13 +1,16 @@
 import { Router, Request, Response } from 'express';
 import { WorldlinePaynimoAdapter } from '../gateways/worldlinePaynimo';
 import { CCAvenueAdapter } from '../gateways/ccavenue';
+import { HDFCCollectNowAdapter } from '../gateways/hdfcCollectNow';
 import { serverTransactionStore } from '../services/transactionStore';
+import { paymentSessionStore } from '../models/paymentSessions';
 import { CreateOrderRequest, ServerTransaction } from '../gateways/gatewayTypes';
 
 export const paymentRouter = Router();
 
 const worldlineAdapter = new WorldlinePaynimoAdapter();
 const ccavenueAdapter = new CCAvenueAdapter();
+const hdfcCollectNowAdapter = new HDFCCollectNowAdapter();
 
 /**
  * 1. GET /api/gateways/status
@@ -15,7 +18,9 @@ const ccavenueAdapter = new CCAvenueAdapter();
  */
 paymentRouter.get('/gateways/status', (_req: Request, res: Response) => {
   const worldlineStatus = worldlineAdapter.getStatus();
-  const ccavenueStatus = ccavenueAdapter.getStatus();
+  const collectNowStatus = hdfcCollectNowAdapter.getStatus();
+  // If HDFC Collect Now has active test credentials, report it as the primary HDFC engine
+  const ccavenueStatus = collectNowStatus.canProcessLiveSandbox ? collectNowStatus : ccavenueAdapter.getStatus();
 
   const simulatorStatus = {
     id: 'DEMO_SIMULATOR',
@@ -62,12 +67,8 @@ paymentRouter.post('/payments/create-order', (req: Request, res: Response): any 
   const txnId = `TXN-${dateStr}-${randNum}`;
   const orderId = `ORD-AIMA-${body.applicationCode}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-  // Determine gateway amount:
-  // For Worldline & CCAvenue test transactions: Scale nominal fee to standard test amount (₹2.00)
+  // Determine gateway amount (actual total fee for real payment processing)
   let gatewayAmount = body.totalAmount;
-  if (body.gateway === 'WORLDLINE_PAYNIMO' || body.gateway === 'CCAVENUE') {
-    gatewayAmount = 2.0;
-  }
 
   const isSimulated = body.gateway === 'DEMO_SIMULATOR';
 
@@ -207,10 +208,212 @@ paymentRouter.post('/payments/worldline/callback', (req: Request, res: Response)
 
   serverTransactionStore.markCallbackProcessed(idempotencyKey);
 
+  if (verification.status === 'SUCCESS') {
+    const session = paymentSessionStore.getByOrderId(updatedTxn.orderId);
+    if (session) {
+      paymentSessionStore.markCompleted(session.sessionToken);
+    }
+  }
+
   res.json({
     success: true,
     transaction: updatedTxn,
   });
+});
+
+/**
+ * 4b. POST /api/payments/hdfc-collectnow/create-order
+ * Creates an official order on HDFC Bank Collect Now (Razorpay API)
+ */
+paymentRouter.post('/payments/hdfc-collectnow/create-order', async (req: Request, res: Response): Promise<any> => {
+  const { transactionId } = req.body;
+  if (!transactionId) {
+    return res.status(400).json({ error: 'transactionId is required' });
+  }
+
+  const txn = serverTransactionStore.getById(transactionId);
+  if (!txn) {
+    return res.status(404).json({ error: 'Transaction not found' });
+  }
+
+  try {
+    const orderData = await hdfcCollectNowAdapter.createOrder(txn);
+
+    txn.gatewayTransactionId = orderData.orderId;
+    txn.auditTrail.push({
+      step: 'HDFC Collect Now Order Created',
+      timestamp: new Date().toISOString(),
+      detail: `Created Razorpay order ${orderData.orderId} for MID ${orderData.mid}. Amount: ₹${(orderData.amount / 100).toFixed(2)} (in paise: ${orderData.amount})`,
+      status: 'ok',
+    });
+    serverTransactionStore.save(txn);
+
+    res.json({
+      success: true,
+      order: orderData,
+      transaction: txn,
+    });
+  } catch (err: any) {
+    res.status(400).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+/**
+ * 4c. POST /api/payments/hdfc-collectnow/verify
+ * Verifies payment signature and marks transaction completed
+ */
+paymentRouter.post('/payments/hdfc-collectnow/verify', async (req: Request, res: Response): Promise<any> => {
+  const { transactionId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+  if (!transactionId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).json({ error: 'Missing required verification parameters' });
+  }
+
+  const txn = serverTransactionStore.getById(transactionId);
+  if (!txn) {
+    return res.status(404).json({ error: `Transaction ${transactionId} not found` });
+  }
+
+  const verification = await hdfcCollectNowAdapter.verifyPayment({
+    orderId: razorpay_order_id,
+    paymentId: razorpay_payment_id,
+    signature: razorpay_signature,
+  });
+
+  const updatedTxn = serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
+    status: verification.status,
+    statusReason: verification.statusReason,
+    bankReference: verification.bankReference,
+    authCode: verification.authCode,
+    gatewayTransactionId: verification.gatewayTransactionId,
+    gatewayStatusCode: verification.status === 'SUCCESS' ? 'captured' : 'failed',
+    paymentMode: verification.paymentMode || 'NetBanking',
+    bankName: verification.bankName || 'HDFC Bank',
+    verificationMethod: 'HASH_VALIDATION',
+  });
+
+  if (verification.status === 'SUCCESS') {
+    const session = paymentSessionStore.getByOrderId(txn.orderId);
+    if (session) {
+      paymentSessionStore.markCompleted(session.sessionToken);
+    }
+  }
+
+  res.json({
+    success: true,
+    transaction: updatedTxn,
+  });
+});
+
+/**
+ * 4d. POST /api/payments/hdfc-collectnow/cancel
+ * Handles candidate modal dismissal / abort
+ */
+paymentRouter.post('/payments/hdfc-collectnow/cancel', (req: Request, res: Response): any => {
+  const { transactionId, reason } = req.body;
+  if (!transactionId) {
+    return res.status(400).json({ error: 'transactionId is required' });
+  }
+
+  const txn = serverTransactionStore.getById(transactionId);
+  if (!txn) {
+    return res.status(404).json({ error: 'Transaction not found' });
+  }
+
+  const updatedTxn = serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
+    status: 'CANCELLED',
+    statusReason: reason || 'Customer dismissed checkout modal before completing payment',
+    verificationMethod: 'HASH_VALIDATION',
+  });
+
+  res.json({
+    success: true,
+    transaction: updatedTxn,
+  });
+});
+
+/**
+ * 4e. POST /api/payments/hdfc-collectnow/callback
+ * Handles direct POST callback from HDFC Collect Now Embedded Checkout
+ * (https://api.razorpay.com/v1/checkout/embedded POSTs back to this URL)
+ */
+paymentRouter.post('/payments/hdfc-collectnow/callback', async (req: Request, res: Response): Promise<any> => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).send('Missing required payment parameters from HDFC Collect Now callback.');
+  }
+
+  // Find transaction by gatewayTransactionId (order_id) or orderId
+  const allTxns = serverTransactionStore.getAll();
+  const txn = allTxns.find(
+    (t) => t.gatewayTransactionId === razorpay_order_id || t.orderId === razorpay_order_id
+  );
+
+  if (!txn) {
+    return res.status(404).send(`Order ${razorpay_order_id} not found in transaction ledger.`);
+  }
+
+  const verification = await hdfcCollectNowAdapter.verifyPayment({
+    orderId: razorpay_order_id,
+    paymentId: razorpay_payment_id,
+    signature: razorpay_signature,
+  });
+
+  const updatedTxn = serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
+    status: verification.status,
+    statusReason: verification.statusReason,
+    bankReference: verification.bankReference,
+    authCode: verification.authCode,
+    gatewayTransactionId: verification.gatewayTransactionId,
+    gatewayStatusCode: verification.status === 'SUCCESS' ? 'captured' : 'failed',
+    paymentMode: verification.paymentMode || 'NetBanking',
+    bankName: verification.bankName || 'HDFC Bank',
+    verificationMethod: 'HASH_VALIDATION',
+  });
+
+  // Resolve session: try by orderId, by query token, or by reference
+  const tokenParam = (req.query.token as string) || '';
+  let session = paymentSessionStore.getByOrderId(txn.orderId);
+  if (!session && tokenParam) {
+    session = paymentSessionStore.getAnyByToken(tokenParam);
+  }
+  if (!session && txn.applicationRef) {
+    session = paymentSessionStore.findActivePending(txn.applicationCode, txn.applicationRef) ||
+              paymentSessionStore.getAll().find(
+                (s) => s.sourceCode === txn.applicationCode && s.applicationReference === txn.applicationRef
+              );
+  }
+
+  if (session && verification.status === 'SUCCESS') {
+    paymentSessionStore.markCompleted(session.sessionToken);
+  }
+
+  const targetReturnUrl = (req.query.returnUrl as string) || session?.returnUrl;
+
+  // If targetReturnUrl is available, redirect directly back to originating app
+  if (targetReturnUrl) {
+    try {
+      const returnUrlObj = new URL(targetReturnUrl);
+      returnUrlObj.searchParams.set('orderId', txn.orderId);
+      returnUrlObj.searchParams.set('transactionId', txn.id);
+      returnUrlObj.searchParams.set('status', verification.status);
+      returnUrlObj.searchParams.set('reference', txn.applicationRef);
+      returnUrlObj.searchParams.set('paymentId', razorpay_payment_id);
+      return res.redirect(returnUrlObj.toString());
+    } catch {
+      const sep = targetReturnUrl.includes('?') ? '&' : '?';
+      return res.redirect(
+        `${targetReturnUrl}${sep}orderId=${encodeURIComponent(txn.orderId)}&transactionId=${encodeURIComponent(txn.id)}&status=${verification.status}&reference=${encodeURIComponent(txn.applicationRef)}&paymentId=${encodeURIComponent(razorpay_payment_id)}`
+      );
+    }
+  }
+
+  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  return res.redirect(`${appUrl}/?orderId=${encodeURIComponent(txn.orderId)}&status=${verification.status}`);
 });
 
 /**
@@ -294,6 +497,13 @@ paymentRouter.post('/payments/ccavenue/callback', (req: Request, res: Response):
   });
 
   serverTransactionStore.markCallbackProcessed(idempotencyKey);
+
+  if (verification.status === 'SUCCESS') {
+    const session = paymentSessionStore.getByOrderId(txn.orderId);
+    if (session) {
+      paymentSessionStore.markCompleted(session.sessionToken);
+    }
+  }
 
   res.json({
     success: true,

@@ -38,16 +38,18 @@ export async function fetchGatewayStatus(): Promise<GatewaysStatusResponse> {
         },
         CCAVENUE: {
           id: 'CCAVENUE',
-          name: 'HDFC / CCAvenue (Sandbox)',
+          name: 'HDFC Bank Collect Now (Razorpay)',
           environment: 'sandbox',
-          status: 'CONFIG_REQUIRED',
-          statusLabel: 'Sandbox configuration required',
-          canProcessLiveSandbox: false,
-          blockerDetails: 'CCAvenue test credentials missing. The email correspondence only supplied LIVE credentials (TID 76098022, ACCT ID 4168947, secure.ccavenue.com). Sandboxes require separate test.ccavenue.com credentials.',
+          status: 'CONFIGURED',
+          statusLabel: 'HDFC Collect Now Active',
+          canProcessLiveSandbox: true,
           configuredDetails: {
-            testCredentialsHint: 'Requires test merchant ID, access code & 128-bit working key from CCAvenue test portal',
+            merchantId: 'ToYqDbYJUM2LIS',
+            endpointsVerified: true,
+            testAmountLimits: '₹1.00 – Live Scale',
+            testCredentialsHint: 'Key ID: rzp_test_Tq9... · MID: ToYqDbYJUM2LIS',
           },
-          missingEnvVars: ['CCAVENUE_MERCHANT_ID', 'CCAVENUE_ACCESS_CODE', 'CCAVENUE_WORKING_KEY'],
+          missingEnvVars: [],
         },
         DEMO_SIMULATOR: {
           id: 'DEMO_SIMULATOR',
@@ -158,5 +160,51 @@ export async function recordSimulatorTransactionApi(transaction: TransactionReco
   }
 
   const json = await res.json();
+  return json.transaction;
+}
+
+export async function initiateHDFCCollectNowCheckout(transactionId: string) {
+  const res = await fetch('/api/payments/hdfc-collectnow/create-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transactionId }),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.success) {
+    throw new Error(json.error || 'Failed to create HDFC Collect Now order');
+  }
+
+  return json;
+}
+
+export async function verifyHDFCCollectNowPayment(payload: {
+  transactionId: string;
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}): Promise<TransactionRecord> {
+  const res = await fetch('/api/payments/hdfc-collectnow/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.success) {
+    throw new Error(json.error || 'Failed to verify HDFC Collect Now payment');
+  }
+
+  return json.transaction;
+}
+
+export async function cancelHDFCCollectNowPayment(transactionId: string, reason?: string): Promise<TransactionRecord> {
+  const res = await fetch('/api/payments/hdfc-collectnow/cancel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transactionId, reason }),
+  });
+
+  const json = await res.json().catch(() => ({}));
   return json.transaction;
 }

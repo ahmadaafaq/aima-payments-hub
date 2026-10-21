@@ -24,9 +24,10 @@ import {
 
 interface AdminDashboardProps {
   transactions: TransactionRecord[];
-  onResetData: () => void;
+  onResetData?: () => void;
   onViewReceipt: (transaction: TransactionRecord) => void;
-  onViewSync: (transaction: TransactionRecord) => void;
+  onViewSync?: (transaction: TransactionRecord) => void;
+  onReconcileSuccess?: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -34,12 +35,59 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onResetData,
   onViewReceipt,
   onViewSync,
+  onReconcileSuccess,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGateway, setSelectedGateway] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedApp, setSelectedApp] = useState<string>('ALL');
   const [detailModalTransaction, setDetailModalTransaction] = useState<TransactionRecord | null>(null);
+
+  // Reconciliation State
+  const [showReconcilePanel, setShowReconcilePanel] = useState<boolean>(false);
+  const [recStatus, setRecStatus] = useState<'SUCCESS' | 'FAILED' | 'CANCELLED'>('SUCCESS');
+  const [recBankRef, setRecBankRef] = useState<string>('');
+  const [recNote, setRecNote] = useState<string>('');
+  const [recSubmitting, setRecSubmitting] = useState<boolean>(false);
+  const [recSuccessMsg, setRecSuccessMsg] = useState<string | null>(null);
+
+  const handleReconcileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!detailModalTransaction) return;
+    setRecSubmitting(true);
+    setRecSuccessMsg(null);
+    try {
+      const token = localStorage.getItem('aima_admin_token') || 'aima-admin-dev-token-2026';
+      const res = await fetch(`/api/v1/admin/transactions/${encodeURIComponent(detailModalTransaction.id)}/reconcile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: recStatus,
+          note: recNote.trim() || 'Manual resolution by administrator',
+          bankReference: recBankRef.trim() || detailModalTransaction.bankReference,
+          adminUser: 'AIMA Admin',
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Reconciliation failed');
+      }
+
+      const data = await res.json();
+      setDetailModalTransaction(data.transaction);
+      setRecSuccessMsg('Transaction successfully reconciled and persisted to Supabase database!');
+      setShowReconcilePanel(false);
+      if (onReconcileSuccess) onReconcileSuccess();
+    } catch (err: any) {
+      alert(`Reconciliation Error: ${err.message}`);
+    } finally {
+      setRecSubmitting(false);
+    }
+  };
 
   // Calculate Metrics
   const metrics = useMemo(() => {
@@ -203,15 +251,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <Download className="w-3.5 h-3.5 text-slate-600" />
             <span>Export CSV Report</span>
           </button>
-
-          <button
-            onClick={onResetData}
-            title="Reset demo data to default preset"
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 cursor-pointer transition-colors"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Data</span>
-          </button>
         </div>
       </div>
 
@@ -292,14 +331,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </h3>
 
           <div className="space-y-4 text-xs">
-            {/* HDFC CCAvenue */}
+            {/* HDFC Collect Now */}
             <div className="p-3.5 rounded-lg bg-sky-50/50 border border-sky-200/80">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded bg-blue-900 text-white font-bold text-[10px] flex items-center justify-center">
-                    CC
+                    HDFC
                   </div>
-                  <span className="font-bold text-slate-900">HDFC Bank / CCAvenue</span>
+                  <span className="font-bold text-slate-900">HDFC Collect Now (Razorpay)</span>
                 </div>
                 <span className="font-mono font-bold text-slate-900 tabular-nums">
                   {formatINR(metrics.gateways.hdfc.amount)}
@@ -388,7 +427,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             >
               <option value="ALL">All Gateways</option>
               <option value="WORLDLINE_PAYNIMO">Worldline / Paynimo</option>
-              <option value="CCAVENUE">HDFC / CCAvenue</option>
+              <option value="CCAVENUE">HDFC Collect Now (Razorpay)</option>
               <option value="DEMO_SIMULATOR">Demo Simulator</option>
             </select>
           </div>
@@ -495,10 +534,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-medium text-slate-800">
                             {txn.gateway === 'CCAVENUE'
-                              ? 'HDFC CCAvenue'
+                              ? 'HDFC Collect Now (Razorpay)'
                               : txn.gateway === 'WORLDLINE_PAYNIMO'
-                              ? 'Worldline'
-                              : 'Simulator'}
+                              ? 'Worldline / Paynimo'
+                              : 'Demo Simulator'}
                           </span>
                           {txn.isSimulated ? (
                             <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1 py-0.5 rounded uppercase">
@@ -553,17 +592,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </button>
                           <button
                             onClick={() => onViewReceipt(txn)}
-                            title="View / Print Demo Receipt"
+                            title="View / Print Official Receipt"
                             className="p-1.5 rounded hover:bg-slate-200 text-blue-700 transition-colors cursor-pointer"
                           >
                             <FileSpreadsheet className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => onViewSync(txn)}
-                            title="View Originating Application Sync"
-                            className="p-1.5 rounded hover:bg-slate-200 text-emerald-700 transition-colors cursor-pointer"
-                          >
-                            <ExternalLink className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -625,7 +657,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div>
                   <span className="text-[11px] text-slate-500 block">Gateway</span>
                   <span className="font-bold text-slate-800">
-                    {detailModalTransaction.gateway === 'CCAVENUE' ? 'HDFC CCAvenue' : detailModalTransaction.gateway === 'WORLDLINE_PAYNIMO' ? 'Worldline' : 'Simulator'}
+                    {detailModalTransaction.gateway === 'CCAVENUE' ? 'HDFC Collect Now (Razorpay)' : detailModalTransaction.gateway === 'WORLDLINE_PAYNIMO' ? 'Worldline / Paynimo' : 'Demo Simulator'}
                   </span>
                 </div>
                 <div>
@@ -663,6 +695,92 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 )}
               </div>
 
+              {/* Conflict Resolution & Reconciliation Box */}
+              <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/60 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-800" />
+                    <span className="font-bold text-amber-900 text-xs">Administrative Reconciliation & Dispute Resolution</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReconcilePanel(!showReconcilePanel);
+                      setRecBankRef(detailModalTransaction.bankReference || '');
+                      setRecStatus(detailModalTransaction.status === 'SUCCESS' ? 'SUCCESS' : 'SUCCESS');
+                    }}
+                    className="px-2.5 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded font-bold text-[11px] transition-colors cursor-pointer"
+                  >
+                    {showReconcilePanel ? 'Cancel' : 'Reconcile / Resolve Discrepancy'}
+                  </button>
+                </div>
+
+                {recSuccessMsg && (
+                  <div className="p-2.5 bg-emerald-100 border border-emerald-300 rounded text-emerald-800 text-[11px] font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                    <span>{recSuccessMsg}</span>
+                  </div>
+                )}
+
+                {showReconcilePanel && (
+                  <form onSubmit={handleReconcileSubmit} className="pt-2 space-y-3 border-t border-amber-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Reconciled Status
+                        </label>
+                        <select
+                          value={recStatus}
+                          onChange={(e) => setRecStatus(e.target.value as any)}
+                          className="w-full bg-white border border-slate-300 rounded p-1.5 text-slate-900 font-bold"
+                        >
+                          <option value="SUCCESS">SUCCESS (Mark as Settled / Paid)</option>
+                          <option value="FAILED">FAILED (Mark as Failed / Declined)</option>
+                          <option value="CANCELLED">CANCELLED (Refunded / Aborted)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Bank Reference / UTR
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. HDFC-REF-992100"
+                          value={recBankRef}
+                          onChange={(e) => setRecBankRef(e.target.value)}
+                          className="w-full bg-white border border-slate-300 rounded p-1.5 font-mono text-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Dispute / Audit Resolution Note *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Verified with bank statement; student presented UTR confirmation."
+                        value={recNote}
+                        onChange={(e) => setRecNote(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded p-1.5 text-slate-900"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="submit"
+                        disabled={recSubmitting}
+                        className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded text-xs transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        {recSubmitting ? 'Persisting to Database...' : 'Save & Sync Resolution'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+
               {/* Step-by-Step Audit Trail */}
               <div>
                 <h4 className="font-bold text-slate-900 mb-2 uppercase tracking-wider text-[11px]">
@@ -694,14 +812,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* Webhook Delivery response */}
               {detailModalTransaction.callbackResponse && (
                 <div className="bg-slate-900 text-slate-300 p-3.5 rounded-xl font-mono text-[11px] space-y-1">
-                  <div className="text-emerald-400 font-bold">
-                    Callback Dispatched: HTTP {detailModalTransaction.callbackResponse.httpStatus} OK
+                  <div
+                    className={`font-bold ${
+                      detailModalTransaction.callbackDelivered && detailModalTransaction.callbackResponse.httpStatus === 200
+                        ? 'text-emerald-400'
+                        : detailModalTransaction.callbackResponse.httpStatus === 0 || !detailModalTransaction.callbackDelivered
+                        ? 'text-amber-400'
+                        : 'text-rose-400'
+                    }`}
+                  >
+                    {detailModalTransaction.callbackDelivered && detailModalTransaction.callbackResponse.httpStatus === 200
+                      ? `Callback Dispatched: HTTP ${detailModalTransaction.callbackResponse.httpStatus} OK`
+                      : detailModalTransaction.callbackResponse.httpStatus === 0 || !detailModalTransaction.callbackDelivered
+                      ? 'S2S Webhook: Queued for Delivery (Pending Target Endpoint Availability)'
+                      : `Callback Attempt Failed (HTTP ${detailModalTransaction.callbackResponse.httpStatus}): Retrying`}
                   </div>
                   <div className="text-slate-400 text-[10px] truncate">
                     Target: {detailModalTransaction.callbackResponse.targetUrl}
                   </div>
-                  <div className="text-amber-300 text-[10px]">
-                    Payload: {detailModalTransaction.callbackResponse.payloadSnippet}
+                  <div className="text-amber-300 text-[10px] break-all">
+                    Payload / Status: {detailModalTransaction.callbackResponse.payloadSnippet}
                   </div>
                 </div>
               )}
@@ -716,7 +846,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 }}
                 className="text-[#002b49] font-bold hover:underline"
               >
-                Open Printable Demo Receipt
+                Open Official Tax Receipt
               </button>
 
               <button

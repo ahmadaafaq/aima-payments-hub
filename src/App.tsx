@@ -10,6 +10,7 @@ import { OriginatingAppSyncDemo } from './components/OriginatingAppSyncDemo';
 import { AdminDashboard } from './components/AdminDashboard';
 import { StakeholderDemoGuide } from './components/StakeholderDemoGuide';
 import { AppRegistry } from './components/AppRegistry';
+import { AdminWrapper } from './components/AdminWrapper';
 import { AimaLogo } from './components/AimaLogo';
 import { AIMA_APPLICATIONS, INITIAL_TRANSACTIONS } from './data/aimaApplications';
 import { 
@@ -30,13 +31,34 @@ import {
   createServerOrder, 
   initiateWorldlineCheckout, 
   initiateCCAvenueCheckout,
+  initiateHDFCCollectNowCheckout,
+  verifyHDFCCollectNowPayment,
+  cancelHDFCCollectNowPayment,
   postWorldlineCallback,
   recordSimulatorTransactionApi 
 } from './services/gatewayApi';
-import { ShieldCheck, Info, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Info, CheckCircle2, RotateCcw, AlertTriangle, Clock, ArrowRight } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('applications');
+  const getInitialTab = (): ActiveTab => {
+    const pathname = window.location.pathname;
+    const search = new URLSearchParams(window.location.search);
+    if (pathname.includes('/checkout/') || search.has('session')) {
+      return 'checkout';
+    }
+    if (pathname.includes('/admin') || pathname.startsWith('/payments') || search.get('tab') === 'admin' || search.has('admin')) {
+      return 'admin';
+    }
+    return 'applications';
+  };
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>(getInitialTab);
+  const [adminSection, setAdminSection] = useState<'ledger' | 'registry'>(() => {
+    const search = new URLSearchParams(window.location.search);
+    return window.location.pathname.includes('/registry') || search.get('section') === 'registry'
+      ? 'registry'
+      : 'ledger';
+  });
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
 
   // Gateway status cache from server
@@ -95,6 +117,14 @@ export default function App() {
   const [lastTransaction, setLastTransaction] = useState<TransactionRecord | null>(null);
   const [checkoutSubView, setCheckoutSubView] = useState<'form' | 'result'>('form');
   const [sessionReturnUrl, setSessionReturnUrl] = useState<string | null>(null);
+  const [activeSessionToken, setActiveSessionToken] = useState<string | null>(null);
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<{
+    code: 'SESSION_EXPIRED' | 'SESSION_NOT_FOUND';
+    message: string;
+    returnUrl?: string;
+    orderId?: string;
+  } | null>(null);
 
   // Load initial stored transactions & gateway statuses on mount
   useEffect(() => {
@@ -139,37 +169,74 @@ export default function App() {
     }
 
     if (sessionToken) {
+      setActiveSessionToken(sessionToken);
       fetch(`/api/v1/session/${sessionToken}`)
         .then((r) => r.json())
         .then((data) => {
+          if (data?.error === 'SESSION_EXPIRED' || data?.session?.status === 'EXPIRED') {
+            setSessionError({
+              code: 'SESSION_EXPIRED',
+              message: data.message || 'This payment session has expired.',
+              returnUrl: data.session?.returnUrl,
+              orderId: data.session?.orderId,
+            });
+            setActiveTab('checkout');
+            return;
+          }
+
+          if (data?.error === 'SESSION_NOT_FOUND') {
+            setSessionError({
+              code: 'SESSION_NOT_FOUND',
+              message: data.message || 'Payment session not found or has expired. Please return to your application.',
+            });
+            setActiveTab('checkout');
+            return;
+          }
+
           if (data?.session) {
             const sess = data.session;
+            const order = data.order || {};
             if (sess.returnUrl) {
               setSessionReturnUrl(sess.returnUrl);
             }
-            setActiveOrderId(sess.orderId);
-            if (sess.selectedGateway) {
-              setSelectedGateway(sess.selectedGateway as PaymentGateway);
+            if (sess.expiresAt) {
+              setSessionExpiresAt(sess.expiresAt);
             }
-            // Match application
+            setActiveOrderId(order.orderId || sess.orderId);
+            if (sess.resolvedGateway) {
+              setSelectedGateway(sess.resolvedGateway as PaymentGateway);
+            }
+
+            // Match application (normalize hyphens/underscores for resilient matching)
+            const normalize = (s: string) => s.toUpperCase().replace(/[-_]/g, '');
             const foundApp = AIMA_APPLICATIONS.find(
               (a) =>
-                a.code.toUpperCase() === sess.sourceCode.toUpperCase() ||
+                normalize(a.code) === normalize(sess.sourceCode) ||
                 a.name.toUpperCase().includes(sess.sourceCode.toUpperCase())
             ) || AIMA_APPLICATIONS[0];
             setSelectedApp(foundApp);
 
             setSelectedApplicant({
-              name: sess.customerName || 'Candidate',
-              refNo: sess.applicationReference || sess.orderId,
-              email: sess.customerEmail || 'applicant@aima.in',
-              phone: sess.customerPhone || '',
-              courseOrEvent: sess.paymentPurpose || 'Case League Registration',
-              feeDescription: sess.paymentPurpose || 'Registration Fee',
-              baseAmount: (sess.amountPaise || 10000) / 100,
+              name: order.customerName || 'Candidate',
+              refNo: order.applicationReference || order.orderId || '',
+              email: order.customerEmail || 'applicant@aima.in',
+              phone: order.customerPhone || '',
+              courseOrEvent: order.paymentPurpose || sess.sourceName || 'Registration',
+              feeDescription: order.paymentPurpose || 'Registration Fee',
+              baseAmount: (order.amountPaise || 10000) / 100,
               gstAmount: 0,
-              totalAmount: (sess.amountPaise || 10000) / 100,
+              totalAmount: (order.amountPaise || 10000) / 100,
             });
+
+            // If session or order is ALREADY completed (e.g. user re-visits URL after payment):
+            if (sess.isCompleted || order.status === 'SUCCESS' || data.transaction?.status === 'SUCCESS') {
+              if (data.transaction) {
+                setLastTransaction(data.transaction);
+              }
+              setActiveTab('checkout');
+              setCheckoutSubView('result');
+              return;
+            }
 
             setActiveTab('checkout');
             setCheckoutSubView('form');
@@ -255,12 +322,12 @@ export default function App() {
       return;
     }
 
-    // GATEWAY 2: CCAvenue Live Kit Payment
+    // GATEWAY 2: HDFC Collect Now (Powered by Razorpay) Payment
     if (chosenGateway === 'CCAVENUE') {
       const ccStatus = gatewayStatuses['CCAVENUE'];
       if (ccStatus && !ccStatus.canProcessLiveSandbox) {
         setInitiationError(
-          'Gateway Configuration Error: HDFC / CCAvenue sandbox credentials are not configured. Cannot process payments without active test keys. Falling back to simulator is strictly prohibited.'
+          'Gateway Configuration Error: HDFC Collect Now test credentials are not configured. Cannot process payments without active test keys. Falling back to simulator is strictly prohibited.'
         );
         return;
       }
@@ -283,17 +350,53 @@ export default function App() {
           portalUrl: selectedApp.portalUrl,
         });
 
-        const initResponse = await initiateCCAvenueCheckout(newTxn.id);
-        setCcavenuePayload(initResponse.payload);
+        const initResponse = await initiateHDFCCollectNowCheckout(newTxn.id);
         setLastTransaction(newTxn);
-        setIsCCAvenueModalOpen(true);
-      } catch (err: any) {
-        setInitiationError(err.message || 'Failed to initiate CCAvenue Live Kit session');
-      } finally {
-        setIsInitiating(false);
+
+        // Ensure Razorpay Checkout SDK is loaded
+          // HDFC Bank Collect Now — Embedded Checkout Flow (Section 3.2 Integration Guide)
+          // Submits form POST directly to https://api.razorpay.com/v1/checkout/embedded with callback_url
+          const callbackParams = new URLSearchParams();
+          if (sessionReturnUrl) callbackParams.set('returnUrl', sessionReturnUrl);
+          if (activeSessionToken) callbackParams.set('token', activeSessionToken);
+          const callbackQuery = callbackParams.toString() ? `?${callbackParams.toString()}` : '';
+          const callbackUrl = `${window.location.origin}/api/payments/hdfc-collectnow/callback${callbackQuery}`;
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = 'https://api.razorpay.com/v1/checkout/embedded';
+
+          const formFields: Record<string, string> = {
+            key_id: initResponse.order.keyId,
+            order_id: initResponse.order.orderId,
+            amount: String(initResponse.order.amount),
+            name: 'All India Management Association',
+            description: `${selectedApp.code} — ${selectedApplicant.feeDescription}`,
+            'prefill[name]': selectedApplicant.name,
+            'prefill[email]': selectedApplicant.email,
+            'prefill[contact]': selectedApplicant.phone.replace(/[^0-9]/g, '').slice(-10) || '9876543210',
+            'notes[transaction_id]': newTxn.id,
+            'notes[application_ref]': selectedApplicant.refNo,
+            callback_url: callbackUrl,
+          };
+
+          for (const [key, value] of Object.entries(formFields)) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = value;
+            form.appendChild(input);
+          }
+
+          document.body.appendChild(form);
+          form.submit();
+          return;
+        } catch (err: any) {
+          setInitiationError(err.message || 'Failed to initiate HDFC Collect Now session');
+        } finally {
+          setIsInitiating(false);
+        }
+        return;
       }
-      return;
-    }
 
     // GATEWAY 3: Phase 1 Demo Simulator
     setIsSimulatorOpen(true);
@@ -500,8 +603,8 @@ export default function App() {
           setActiveTab(tab);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        onResetData={handleResetData}
         hasActiveOrder={checkoutSubView === 'form'}
+        hideNavigation={Boolean(sessionReturnUrl || new URLSearchParams(window.location.search).get('session') || window.location.pathname.includes('/checkout/'))}
       />
 
       {/* Initiation Error Banner if any */}
@@ -532,13 +635,71 @@ export default function App() {
         {/* Tab 2: Centralized Payment Page & Result */}
         {activeTab === 'checkout' && (
           <>
-            {checkoutSubView === 'form' ? (
+            {sessionError ? (
+              <div className="max-w-md mx-auto my-12 bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-lg space-y-5 animate-in fade-in">
+                <div className="w-14 h-14 rounded-full bg-amber-100 text-amber-700 mx-auto flex items-center justify-center shadow-inner">
+                  <Clock className="w-8 h-8" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-xl font-bold text-slate-900">
+                    {sessionError.code === 'SESSION_EXPIRED' ? 'Payment Session Expired' : 'Invalid Payment Session'}
+                  </h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    {sessionError.message}
+                  </p>
+                </div>
+
+                {sessionError.orderId && (
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-mono text-slate-600 flex justify-between">
+                    <span>Order ID:</span>
+                    <span className="font-bold text-slate-900">{sessionError.orderId}</span>
+                  </div>
+                )}
+
+                <div>
+                  {sessionError.returnUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          const target = new URL(sessionError.returnUrl!);
+                          if (sessionError.orderId) target.searchParams.set('orderId', sessionError.orderId);
+                          target.searchParams.set('status', 'FAILED');
+                          target.searchParams.set('reason', sessionError.code);
+                          window.location.href = target.toString();
+                        } catch {
+                          window.location.href = sessionError.returnUrl!;
+                        }
+                      }}
+                      className="w-full py-3.5 px-4 rounded-xl font-bold text-xs bg-[#002b49] hover:bg-[#003860] text-white transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <span>Return to Originating Application</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSessionError(null);
+                        setActiveTab('applications');
+                      }}
+                      className="w-full py-3.5 px-4 rounded-xl font-bold text-xs bg-[#002b49] hover:bg-[#003860] text-white transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <span>Return to Applications</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : checkoutSubView === 'form' ? (
               <CentralizedPaymentPage
                 application={selectedApp}
                 applicant={selectedApplicant}
                 orderId={activeOrderId}
                 selectedGateway={selectedGateway}
                 gatewayStatuses={gatewayStatuses}
+                sessionReturnUrl={sessionReturnUrl}
+                expiresAt={sessionExpiresAt || undefined}
                 onSelectGateway={setSelectedGateway}
                 onProceedToPay={handleProceedToPay}
                 onBackToApps={() => setActiveTab('applications')}
@@ -589,29 +750,45 @@ export default function App() {
           </>
         )}
 
-        {/* Tab 3: Admin Dashboard */}
+        {/* Tab 3: Admin Console (MIS Ledger & App Registry) */}
         {activeTab === 'admin' && (
-          <AdminDashboard
-            transactions={transactions}
-            onResetData={handleResetData}
-            onViewReceipt={(txn) => {
-              setLastTransaction(txn);
-              setSelectedApp(
-                AIMA_APPLICATIONS.find((a) => a.id === txn.applicationId) || AIMA_APPLICATIONS[0]
-              );
-              setCheckoutSubView('result');
-              setActiveTab('checkout');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onViewSync={(txn) => {
-              setLastTransaction(txn);
-              setSelectedApp(
-                AIMA_APPLICATIONS.find((a) => a.id === txn.applicationId) || AIMA_APPLICATIONS[0]
-              );
-              setActiveTab('sync');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
+          <AdminWrapper 
+            activeSection={adminSection}
+            onSelectSection={setAdminSection}
+          >
+            {adminSection === 'ledger' ? (
+              <AdminDashboard
+                transactions={transactions}
+                onReconcileSuccess={() => {
+                  fetch('/api/transactions')
+                    .then((r) => r.json())
+                    .then((data) => {
+                      if (Array.isArray(data?.transactions)) setTransactions(data.transactions);
+                    })
+                    .catch(() => {});
+                }}
+                onViewReceipt={(txn) => {
+                  setLastTransaction(txn);
+                  setSelectedApp(
+                    AIMA_APPLICATIONS.find((a) => a.id === txn.applicationId) || AIMA_APPLICATIONS[0]
+                  );
+                  setCheckoutSubView('result');
+                  setActiveTab('checkout');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onViewSync={(txn) => {
+                  setLastTransaction(txn);
+                  setSelectedApp(
+                    AIMA_APPLICATIONS.find((a) => a.id === txn.applicationId) || AIMA_APPLICATIONS[0]
+                  );
+                  setActiveTab('sync');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
+            ) : (
+              <AppRegistry />
+            )}
+          </AdminWrapper>
         )}
 
         {/* Tab 4: Originating App Return Sync Demo */}
@@ -642,11 +819,6 @@ export default function App() {
             onOpenAdmin={() => setActiveTab('admin')}
             onOpenApps={() => setActiveTab('applications')}
           />
-        )}
-
-        {/* Tab 6: Phase 3 Application Registry (Admin) */}
-        {activeTab === 'registry' && (
-          <AppRegistry />
         )}
       </main>
 
@@ -700,9 +872,10 @@ export default function App() {
             </div>
 
             <div className="text-xs text-slate-400 flex items-center gap-2">
-              <span className="font-mono text-emerald-400">Worldline Sandbox: T945221</span>
-              <span>·</span>
-              <span className="font-mono text-amber-400">CCAvenue: Config Required</span>
+              <span className="inline-flex items-center gap-1.5 text-emerald-400 font-semibold">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                PCI-DSS Level 1 · 256-Bit SSL Encrypted
+              </span>
             </div>
           </div>
 
@@ -713,9 +886,7 @@ export default function App() {
             <div className="flex items-center gap-4">
               <span>GSTIN: 07AAATA0865F1Z2</span>
               <span>·</span>
-              <span>SAC: 999293</span>
-              <span>·</span>
-              <span className="text-emerald-400 font-semibold">Phase 2 Sandbox Enabled</span>
+              <span>Official Institutional Payments Gateway Hub</span>
             </div>
           </div>
         </div>

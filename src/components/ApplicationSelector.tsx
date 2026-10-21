@@ -273,23 +273,19 @@ export const ApplicationSelector: React.FC<ApplicationSelectorProps> = ({
         })}
       </div>
 
-      {/* Stakeholder Architecture Callout */}
-      <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-5 text-xs text-amber-950 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* Institutional Security Notice */}
+      <div className="bg-slate-100 border border-slate-200 rounded-xl p-4 text-xs text-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
-          <ShieldCheck className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+          <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
           <div>
             <h4 className="font-bold text-slate-900 text-sm">
-              Architecture Benefit: Decoupled Payment Logic
+              Consolidated Payment Architecture
             </h4>
             <p className="text-slate-600 mt-0.5">
-              Individual application teams (MAT, CME, Case League) no longer need to implement bank integration kits,
-              manage checksum hashing, or handle PG upgrades. All payment logic, GST compliance, and reconciliation 
-              is consolidated into this single hub.
+              Individual application teams (MAT, CME, Case League) route payments through this centralized hub.
+              All payment transactions, GST compliance, and reconciliation are unified in real-time.
             </p>
           </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[11px] text-slate-500 font-mono">TID: 76098022 · HDFC Bank</span>
         </div>
       </div>
 

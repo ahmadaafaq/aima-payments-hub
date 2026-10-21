@@ -379,6 +379,65 @@ runTest('Admin can register a new application with custom gateway assignment', (
   assert.strictEqual(registry.resolveGatewayForSource('NEW_AIMA_PORTAL'), 'WORLDLINE_PAYNIMO');
 });
 
+// ─── Test Suite 8: Reference Idempotency & Duplicate Payment Guardrails ───────
+console.log('\n--- Test Suite 8: Reference Idempotency & Duplicate Payment Guardrails ---');
+
+runTest('findActivePending returns unexpired pending session for matching source and reference', () => {
+  const store = new PaymentSessionStore();
+  const session = store.create({
+    transactionId: 'TXN-IDEM-001',
+    orderId: 'ORD-AIMA-CASE_LEAGUE-001',
+    sourceCode: 'CASE_LEAGUE',
+    externalOrderId: 'ICRC-REG-2026',
+    applicationReference: 'ICRC-REG-2026',
+    paymentPurpose: 'REGISTRATION_FEE',
+    amountPaise: 59000,
+    currency: 'INR',
+    customerName: 'Dr. Vikram Malhotra',
+    customerEmail: 'vikram@aima.in',
+    customerPhone: '9876543210',
+    returnUrl: 'http://localhost:3000',
+    selectedGateway: 'CCAVENUE',
+    routingMode: 'EXPLICIT',
+    idempotencyKey: 'IDEM-KEY-001',
+  });
+
+  const found = store.findActivePending('CASE_LEAGUE', 'ICRC-REG-2026');
+  assert(found !== undefined);
+  assert.strictEqual(found?.sessionToken, session.sessionToken);
+  assert.strictEqual(found?.amountPaise, 59000);
+});
+
+runTest('findActivePending returns undefined when session is completed or non-existent', () => {
+  const store = new PaymentSessionStore();
+  const session = store.create({
+    transactionId: 'TXN-IDEM-002',
+    orderId: 'ORD-AIMA-CASE_LEAGUE-002',
+    sourceCode: 'CASE_LEAGUE',
+    externalOrderId: 'ICRC-REG-COMPLETED',
+    applicationReference: 'ICRC-REG-COMPLETED',
+    paymentPurpose: 'REGISTRATION_FEE',
+    amountPaise: 59000,
+    currency: 'INR',
+    customerName: 'Dr. Vikram Malhotra',
+    customerEmail: 'vikram@aima.in',
+    customerPhone: '9876543210',
+    returnUrl: 'http://localhost:3000',
+    selectedGateway: 'CCAVENUE',
+    routingMode: 'EXPLICIT',
+    idempotencyKey: 'IDEM-KEY-002',
+  });
+
+  // Mark completed
+  store.markCompleted(session.sessionToken);
+
+  const found = store.findActivePending('CASE_LEAGUE', 'ICRC-REG-COMPLETED');
+  assert.strictEqual(found, undefined, 'Completed session should not be returned as active pending');
+
+  const notFound = store.findActivePending('CASE_LEAGUE', 'NON-EXISTENT-REF');
+  assert.strictEqual(notFound, undefined);
+});
+
 // ─── Summary ─────────────────────────────────────────────────────────────────
 setTimeout(() => {
   console.log('\n======================================================');

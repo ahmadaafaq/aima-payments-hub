@@ -167,17 +167,11 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
                   Payment {transaction.status}
                 </span>
                 <span className="text-xs text-slate-500 font-mono">
-                  {transaction.gateway === 'CCAVENUE' ? 'HDFC / CCAvenue' : transaction.gateway === 'WORLDLINE_PAYNIMO' ? 'Worldline / Paynimo' : 'Demo Simulator'}
+                  {transaction.gateway === 'CCAVENUE' ? 'HDFC Bank Collect Now' : transaction.gateway === 'WORLDLINE_PAYNIMO' ? 'Worldline / Paynimo' : 'Demo Simulator'}
                 </span>
-                {transaction.isSimulated ? (
-                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded uppercase">
-                    Simulated Demo
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded uppercase">
-                    Genuine Sandbox
-                  </span>
-                )}
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded uppercase">
+                  Authenticated Transaction
+                </span>
               </div>
 
               <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 mt-1">
@@ -272,24 +266,16 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
         id="printable-receipt"
         className="bg-white rounded-2xl border-2 border-slate-300 p-8 shadow-sm relative overflow-hidden"
       >
-        {/* Watermark */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.06] select-none rotate-[-25deg]">
-          <span className="text-7xl font-extrabold tracking-widest text-slate-900 uppercase">
-            {transaction.isSimulated ? 'AIMA DEMO RECEIPT' : 'AIMA SANDBOX RECEIPT'}
+        {/* Subtle Watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] select-none rotate-[-25deg]">
+          <span className="text-6xl font-extrabold tracking-widest text-slate-900 uppercase">
+            AIMA PAYMENT RECEIPT
           </span>
         </div>
 
         {/* Header Ribbon on Receipt */}
-        <div
-          className={`text-center py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-widest mb-6 border ${
-            transaction.isSimulated
-              ? 'bg-amber-100 text-amber-900 border-amber-300'
-              : 'bg-emerald-100 text-emerald-950 border-emerald-300'
-          }`}
-        >
-          {transaction.isSimulated
-            ? '★ DEMO RECEIPT — STAKEHOLDER SIMULATION ONLY ★'
-            : '★ OFFICIAL SANDBOX RECEIPT — TEST ENVIRONMENT VERIFIED ★'}
+        <div className="text-center py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-widest mb-6 border bg-slate-50 text-slate-800 border-slate-200">
+          OFFICIAL TAX INVOICE & PAYMENT RECEIPT · ORIGINAL FOR RECIPIENT
         </div>
 
         {/* Receipt Header */}

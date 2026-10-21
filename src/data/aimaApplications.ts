@@ -79,7 +79,7 @@ export const AIMA_APPLICATIONS: AimaApplication[] = [
   },
   {
     id: 'case-league',
-    code: 'CASE-LEAGUE',
+    code: 'CASE_LEAGUE',
     name: 'AIMA Case League & Olympiad',
     tagline: 'National Management Olympiad & Corporate Case Championship',
     category: 'Corporate',
@@ -482,7 +482,7 @@ export const INITIAL_TRANSACTIONS: TransactionRecord[] = [
     id: 'TXN-20261014-77401',
     orderId: 'ORD-AIMA-CASE-3312',
     applicationId: 'case-league',
-    applicationCode: 'CASE-LEAGUE',
+    applicationCode: 'CASE_LEAGUE',
     applicationName: 'AIMA Case League & Olympiad',
     applicationRef: 'NMO-2026-CORP-089',
     applicantName: 'Dr. Sunita Rao (Team Lead)',

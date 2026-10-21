@@ -121,7 +121,31 @@ export class PaymentSessionStore {
     return this.sessions.get(token);
   }
 
+  /** Retrieve any session by token without expiry filtering (for status checking) */
+  public getAnyByToken(token: string): PaymentSession | undefined {
+    return this.sessions.get(token);
+  }
+
+  /** Retrieve all sessions */
+  public getAll(): PaymentSession[] {
+    return Array.from(this.sessions.values());
+  }
+
+  /** Find an active, unexpired pending session for a given source and application reference */
+  public findActivePending(sourceCode: string, reference: string): PaymentSession | undefined {
+    return Array.from(this.sessions.values()).find(
+      (s) =>
+        s.sourceCode === sourceCode &&
+        s.applicationReference === reference &&
+        s.status === 'PENDING' &&
+        !this.isExpired(s)
+    );
+  }
+
   public isExpired(session: PaymentSession): boolean {
+    if (session.status === 'COMPLETED') {
+      return false; // Completed sessions remain completed
+    }
     if (session.status === 'EXPIRED') {
       return true;
     }

@@ -19,8 +19,17 @@
  * dynamically without code changes.
  */
 
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { GatewayType } from '../gateways/gatewayTypes';
+import { supabaseAdmin } from '../lib/supabaseClient';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DATA_DIR = path.resolve(__dirname, '../data');
+const APPS_FILE_PATH = path.join(DATA_DIR, 'source_applications.json');
 
 export type AmountValidationMode = 'FIXED' | 'VARIABLE' | 'RANGE';
 export type GatewayRoutingMode = 'AUTO' | 'USER_SELECTABLE';
@@ -114,7 +123,111 @@ export class SourceApplicationRegistry {
   private applications: Map<string, SourceApplication> = new Map();
 
   constructor() {
-    this.seedDemoApplications();
+    this.initStore();
+  }
+
+  private initStore() {
+    const isTest = process.env.NODE_ENV === 'test' || process.argv.some((a) => a.includes('.test.'));
+    if (isTest) {
+      this.seedDemoApplications();
+      return;
+    }
+
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+    } catch (e) {}
+
+    let loaded = false;
+    try {
+      if (fs.existsSync(APPS_FILE_PATH)) {
+        const raw = fs.readFileSync(APPS_FILE_PATH, 'utf-8');
+        const list: SourceApplication[] = JSON.parse(raw);
+        if (Array.isArray(list) && list.length > 0) {
+          list.forEach((app) => this.applications.set(app.sourceCode.toUpperCase(), app));
+          loaded = true;
+          console.log(`[SourceApplicationRegistry] Loaded ${list.length} platforms from disk: ${APPS_FILE_PATH}`);
+        }
+      }
+    } catch (err) {
+      console.warn('[SourceApplicationRegistry] Disk read error:', err);
+    }
+
+    if (!loaded || this.applications.size === 0) {
+      this.seedDemoApplications();
+      this.persistToDisk();
+    }
+
+    this.syncFromSupabase().catch(() => {});
+  }
+
+  public persistToDisk() {
+    if (process.env.NODE_ENV === 'test' || process.argv.some((a) => a.includes('.test.'))) return;
+    try {
+      const arr = Array.from(this.applications.values());
+      fs.writeFileSync(APPS_FILE_PATH, JSON.stringify(arr, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('[SourceApplicationRegistry] Disk write error:', err);
+    }
+  }
+
+  private async syncFromSupabase() {
+    try {
+      const { data, error } = await supabaseAdmin.from('aima_source_applications').select('*');
+      if (!error && Array.isArray(data) && data.length > 0) {
+        for (const row of data) {
+          const app: SourceApplication = {
+            id: row.id,
+            sourceCode: row.source_code,
+            aliases: row.aliases || [],
+            name: row.name,
+            department: row.department || 'General',
+            description: row.description || '',
+            isActive: Boolean(row.is_active),
+            assignedGateway: row.assigned_gateway,
+            routingMode: row.routing_mode || 'AUTO',
+            allowedReturnUrls: row.allowed_return_urls || [],
+            notificationUrl: row.notification_url || '',
+            allowedPaymentPurposes: row.allowed_payment_purposes || [],
+            allowedGateways: row.allowed_gateways || ['CCAVENUE', 'WORLDLINE_PAYNIMO', 'DEMO_SIMULATOR'],
+            amountRules: row.amount_rules || [],
+            credentials: row.credentials || [],
+            auditHistory: row.audit_history || [],
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          };
+          this.applications.set(app.sourceCode.toUpperCase(), app);
+        }
+        this.persistToDisk();
+      }
+    } catch (e) {}
+  }
+
+  public async upsertToSupabase(app: SourceApplication) {
+    try {
+      const row = {
+        id: app.id,
+        source_code: app.sourceCode,
+        aliases: app.aliases || [],
+        name: app.name,
+        department: app.department || 'General',
+        description: app.description || '',
+        is_active: app.isActive,
+        assigned_gateway: app.assignedGateway,
+        routing_mode: app.routingMode,
+        allowed_return_urls: app.allowedReturnUrls || [],
+        notification_url: app.notificationUrl || '',
+        allowed_payment_purposes: app.allowedPaymentPurposes || [],
+        allowed_gateways: app.allowedGateways || [],
+        amount_rules: app.amountRules || [],
+        credentials: app.credentials || [],
+        audit_history: app.auditHistory || [],
+        created_at: app.createdAt,
+        updated_at: app.updatedAt,
+      };
+      await supabaseAdmin.from('aima_source_applications').upsert(row, { onConflict: 'source_code' });
+    } catch (e) {}
   }
 
   private seedDemoApplications() {
@@ -856,6 +969,55 @@ export class SourceApplicationRegistry {
       performedBy,
     });
 
+    this.persistToDisk();
+    this.upsertToSupabase(app);
+
+    return app;
+  }
+
+  /**
+   * Update full platform config (admin-only): name, assignedGateway, return URLs, notification URL, department
+   */
+  public updateApplication(
+    sourceCode: string,
+    updates: {
+      name?: string;
+      assignedGateway?: GatewayType;
+      allowedReturnUrls?: string[];
+      notificationUrl?: string;
+      department?: string;
+    },
+    performedBy: string = 'ADMIN'
+  ): SourceApplication {
+    const app = this.getBySourceCode(sourceCode);
+    if (!app) throw new Error(`Application '${sourceCode}' not found`);
+
+    const now = new Date().toISOString();
+    if (updates.name && updates.name.trim()) app.name = updates.name.trim();
+    if (updates.department && updates.department.trim()) app.department = updates.department.trim();
+    if (updates.assignedGateway) {
+      app.assignedGateway = updates.assignedGateway;
+      if (!app.allowedGateways.includes(updates.assignedGateway)) {
+        app.allowedGateways.push(updates.assignedGateway);
+      }
+    }
+    if (updates.allowedReturnUrls && Array.isArray(updates.allowedReturnUrls)) {
+      app.allowedReturnUrls = updates.allowedReturnUrls.map((u) => u.trim()).filter(Boolean);
+    }
+    if (updates.notificationUrl !== undefined) {
+      app.notificationUrl = updates.notificationUrl.trim();
+    }
+    app.updatedAt = now;
+    app.auditHistory.push({
+      timestamp: now,
+      action: 'APPLICATION_UPDATED',
+      detail: `Configuration updated by ${performedBy}`,
+      performedBy,
+    });
+
+    this.persistToDisk();
+    this.upsertToSupabase(app);
+
     return app;
   }
 
@@ -992,6 +1154,8 @@ export class SourceApplicationRegistry {
     };
 
     this.applications.set(config.sourceCode.toUpperCase(), app);
+    this.persistToDisk();
+    this.upsertToSupabase(app);
     return { app, rawApiKey };
   }
 
@@ -1009,6 +1173,9 @@ export class SourceApplicationRegistry {
       detail: `Application ${isActive ? 'activated' : 'deactivated'} by admin`,
       performedBy,
     });
+
+    this.persistToDisk();
+    this.upsertToSupabase(app);
 
     return app;
   }
@@ -1046,7 +1213,25 @@ export class SourceApplicationRegistry {
       performedBy,
     });
 
+    this.persistToDisk();
+    this.upsertToSupabase(app);
+
     return { rawApiKey };
+  }
+
+  /** Delete a source application (admin-only). */
+  public deleteApplication(sourceCode: string, _performedBy: string = 'ADMIN'): boolean {
+    const app = this.getBySourceCode(sourceCode);
+    if (!app) return false;
+
+    const deleted = this.applications.delete(app.sourceCode.toUpperCase());
+    if (deleted) {
+      this.persistToDisk();
+      try {
+        supabaseAdmin.from('aima_source_applications').delete().eq('source_code', app.sourceCode).then(() => {});
+      } catch (e) {}
+    }
+    return deleted;
   }
 
   /** Returns a safe (no secrets) view of the application for API responses. */

@@ -1,0 +1,957 @@
+[
+  {
+    "id": "src-amiacrc-001",
+    "sourceCode": "AMIACRC",
+    "aliases": [
+      "AMIACRC",
+      "AIMA_ICRC",
+      "CASE_LEAGUE",
+      "CASE-LEAGUE",
+      "AIMA_QUIZ",
+      "AIMA-QUIZ",
+      "RESEARCH_AIMA",
+      "AIMA_CASE_LEAGUE"
+    ],
+    "name": "AIMA Centre for Research & Case Studies (AMIACRC)",
+    "department": "CME",
+    "description": "AIMA Centre for Management Research and Case Repository portal (Case League & Research)",
+    "isActive": true,
+    "assignedGateway": "CCAVENUE",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://amiacrc.aima.in",
+      "https://example.com",
+      "http://localhost:4010",
+      "https://aima-quiz.vercel.app",
+      "https://research.aima.in",
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "http://localhost:3001",
+      "http://localhost:3002",
+      "http://localhost:5174",
+      "http://127.0.0.1:3002",
+      "http://0.0.0.0:3002",
+      "http://0.0.0.0:3000"
+    ],
+    "notificationUrl": "https://amiacrc.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "CASE_STUDY_FEE",
+      "RESEARCH_FEE",
+      "REG123",
+      "REGISTRATION_FEE",
+      "BOOTCAMP_FEE",
+      "TEAM_REGISTRATION",
+      "INSTITUTE_REGISTRATION"
+    ],
+    "allowedGateways": [
+      "CCAVENUE",
+      "WORLDLINE_PAYNIMO",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "Case League & Research Registration Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 10000000,
+        "minAmountPaise": 1000,
+        "paymentPurpose": "REGISTRATION_FEE"
+      },
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "Case Study Purchase Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 10000000,
+        "minAmountPaise": 1000,
+        "paymentPurpose": "CASE_STUDY_FEE"
+      },
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "Research Registration Fee",
+        "gstApplicable": false,
+        "maxAmountPaise": 10000000,
+        "minAmountPaise": 1000,
+        "paymentPurpose": "REG123"
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "7997f2dabdbe2779a0de9ac061d974fd927f898f07960321f1c4148803efd7dc",
+        "isActive": true,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_ami",
+        "sourceCode": "AMIACRC",
+        "credentialId": "CRED-AMIACRC-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Seed for CME -> CCAvenue",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      },
+      {
+        "action": "GATEWAY_ASSIGNMENT_UPDATED",
+        "detail": "Assigned gateway updated from CCAVENUE to WORLDLINE_PAYNIMO (Mode: AUTO, Dept: CME)",
+        "timestamp": "2026-10-21T11:46:35.118Z",
+        "performedBy": "ADMIN_TEST"
+      },
+      {
+        "action": "GATEWAY_ASSIGNMENT_UPDATED",
+        "detail": "Assigned gateway updated from WORLDLINE_PAYNIMO to CCAVENUE (Mode: AUTO, Dept: CME)",
+        "timestamp": "2026-10-21T11:46:35.118Z",
+        "performedBy": "ADMIN_TEST"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-21T11:46:35.118+00:00"
+  },
+  {
+    "id": "src-cme-adm-001",
+    "sourceCode": "CME Admission – PGDM PGCM",
+    "aliases": [
+      "CME_ADMISSION",
+      "CME_PGDM",
+      "CME Admission",
+      "CME Admission - PGDM PGCM"
+    ],
+    "name": "CME Admission – PGDM / PGCM",
+    "department": "CME",
+    "description": "AICTE Approved PGDM & PGCM Admissions Portal",
+    "isActive": true,
+    "assignedGateway": "CCAVENUE",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://cmeadmission.aima.in",
+      "https://cme.aima.in",
+      "http://localhost:4011"
+    ],
+    "notificationUrl": "https://cmeadmission.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "ADMISSION_FEE",
+      "ENROLLMENT_FEE",
+      "SEMESTER_FEE"
+    ],
+    "allowedGateways": [
+      "CCAVENUE",
+      "WORLDLINE_PAYNIMO",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "Admission Processing & Enrollment Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 3500000,
+        "minAmountPaise": 500000,
+        "paymentPurpose": "ADMISSION_FEE"
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "ca130f8eb5214ebf197fd4ad77118b7ccd3a502c647ebb96c41784b3e02ca67f",
+        "isActive": true,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_cme",
+        "sourceCode": "CME Admission – PGDM PGCM",
+        "credentialId": "CRED-CMEAdmissionPGDMPGCM-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Seed for CME -> CCAvenue",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-01T00:00:00+00:00"
+  },
+  {
+    "id": "src-cme-amd-001",
+    "sourceCode": "CME AMD DNC",
+    "aliases": [
+      "CME_AMD_DNC",
+      "AMD_DNC",
+      "AMD DNC"
+    ],
+    "name": "CME Advanced Management Diplomas (AMD/DNC)",
+    "department": "CME",
+    "description": "Diploma in Non-Profit & Advanced Management Certification Portal",
+    "isActive": true,
+    "assignedGateway": "CCAVENUE",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://cmeamd.aima.in",
+      "https://cme.aima.in",
+      "http://localhost:4012"
+    ],
+    "notificationUrl": "https://cmeamd.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "DIPLOMA_FEE",
+      "EXAMINATION_FEE"
+    ],
+    "allowedGateways": [
+      "CCAVENUE",
+      "WORLDLINE_PAYNIMO",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "AMD / DNC Course Registration Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 5000000,
+        "minAmountPaise": 500000,
+        "paymentPurpose": "DIPLOMA_FEE"
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "6868c31a6b96f503a4d8167d89995e8097092f748da83b1ea03c0306e07acf74",
+        "isActive": true,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_cme",
+        "sourceCode": "CME AMD DNC",
+        "credentialId": "CRED-CMEAMDDNC-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Seed for CME -> CCAvenue",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-01T00:00:00+00:00"
+  },
+  {
+    "id": "src-amt-001",
+    "sourceCode": "AMT",
+    "aliases": [],
+    "name": "Advanced Management Training (AMT)",
+    "department": "CMS",
+    "description": "Advanced Management Training programs for corporate leaders (CMS)",
+    "isActive": true,
+    "assignedGateway": "CCAVENUE",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://amt.aima.in",
+      "http://localhost:4007"
+    ],
+    "notificationUrl": "https://amt.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "PROGRAM_FEE",
+      "REGISTRATION_FEE"
+    ],
+    "allowedGateways": [
+      "CCAVENUE",
+      "WORLDLINE_PAYNIMO",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "AMT Program Registration Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 20000000,
+        "minAmountPaise": 2000000,
+        "paymentPurpose": "PROGRAM_FEE"
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "07c4c22f967118ae8e3c7b9c5116f18ac47a3639ae531c451908dd41c180f70f",
+        "isActive": true,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_amt",
+        "sourceCode": "AMT",
+        "credentialId": "CRED-AMT-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Seed for CMS -> CCAvenue",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-01T00:00:00+00:00"
+  },
+  {
+    "id": "src-mat-bschool-001",
+    "sourceCode": "MAT B School",
+    "aliases": [
+      "MAT_B_SCHOOL",
+      "MAT_BSCHOOL",
+      "MAT B-School",
+      "MAT BSCHOOL"
+    ],
+    "name": "Management Aptitude Test — B-School Participation",
+    "department": "CMS",
+    "description": "Institutional MI / B-School participation in MAT scoring and candidate sourcing",
+    "isActive": true,
+    "assignedGateway": "CCAVENUE",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://matbschool.aima.in",
+      "https://mat.aima.in",
+      "http://localhost:4001"
+    ],
+    "notificationUrl": "https://matbschool.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "PARTICIPATION_FEE",
+      "LISTING_FEE",
+      "EXAM_FEE"
+    ],
+    "allowedGateways": [
+      "CCAVENUE",
+      "WORLDLINE_PAYNIMO",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "MAT B-School Institutional Annual Participation Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 20000000,
+        "minAmountPaise": 5000000,
+        "paymentPurpose": "PARTICIPATION_FEE"
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "c576ef19f1258ce12ee9a3fb8f976a6feee1374802003c0ffe5ec1b6094a3553",
+        "isActive": true,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_mat",
+        "sourceCode": "MAT B School",
+        "credentialId": "CRED-MATBSchool-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Seed for CMS -> CCAvenue",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-01T00:00:00+00:00"
+  },
+  {
+    "id": "src-ugat-001",
+    "sourceCode": "UGAT",
+    "aliases": [],
+    "name": "Undergraduate Aptitude Test (UGAT)",
+    "department": "CMS",
+    "description": "Undergraduate management entrance test for BBA/BHM/BCA (CMS)",
+    "isActive": true,
+    "assignedGateway": "CCAVENUE",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://ugat.aima.in",
+      "http://localhost:4004"
+    ],
+    "notificationUrl": "https://ugat.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "EXAM_FEE",
+      "REGISTRATION_FEE"
+    ],
+    "allowedGateways": [
+      "CCAVENUE",
+      "WORLDLINE_PAYNIMO",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "FIXED",
+        "currency": "INR",
+        "description": "UGAT Registration Fee",
+        "gstApplicable": false,
+        "paymentPurpose": "EXAM_FEE",
+        "fixedAmountPaise": 65000
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "0c29769652a3ae267c15437ab1b413f05109e7b9642e86cd2d4d4b423ab67054",
+        "isActive": true,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_uga",
+        "sourceCode": "UGAT",
+        "credentialId": "CRED-UGAT-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Seed for CMS -> CCAvenue",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-01T00:00:00+00:00"
+  },
+  {
+    "id": "src-lma-001",
+    "sourceCode": "LMA",
+    "aliases": [],
+    "name": "Local Management Associations (LMA)",
+    "department": "LMA",
+    "description": "Federation of 67+ Local Management Associations across India",
+    "isActive": true,
+    "assignedGateway": "WORLDLINE_PAYNIMO",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://lma.aima.in",
+      "http://localhost:4005"
+    ],
+    "notificationUrl": "https://lma.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "SUBSCRIPTION_FEE",
+      "ANNUAL_SUBSCRIPTION"
+    ],
+    "allowedGateways": [
+      "WORLDLINE_PAYNIMO",
+      "CCAVENUE",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "LMA Annual Affiliation & Subscription Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 5000000,
+        "minAmountPaise": 1500000,
+        "paymentPurpose": "SUBSCRIPTION_FEE"
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "c7b2d20da04557a6d7d39cfe15445af94a7539c766d5f3bc20bbe1b1529f8876",
+        "isActive": true,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_lma",
+        "sourceCode": "LMA",
+        "credentialId": "CRED-LMA-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Seed for LMA -> Worldline",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-01T00:00:00+00:00"
+  },
+  {
+    "id": "src-vlc-001",
+    "sourceCode": "VLC",
+    "aliases": [
+      "VLC_CENTRE",
+      "VIRTUAL_LEARNING_CENTRE",
+      "AIMA_VLC"
+    ],
+    "name": "Virtual Learning Centre (VLC)",
+    "department": "VLC",
+    "description": "AIMA Virtual Learning Centre & live interactive masterclasses",
+    "isActive": true,
+    "assignedGateway": "WORLDLINE_PAYNIMO",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://vlc.aima.in",
+      "https://vcc.aima.in",
+      "http://localhost:4006"
+    ],
+    "notificationUrl": "https://vlc.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "COURSE_FEE",
+      "WORKSHOP_FEE"
+    ],
+    "allowedGateways": [
+      "WORLDLINE_PAYNIMO",
+      "CCAVENUE",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "VLC Live Certificate Course Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 1500000,
+        "minAmountPaise": 250000,
+        "paymentPurpose": "COURSE_FEE"
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "452f36676f5d04a08902ff77afd01e26ad125b1d2ae33a0bc66dceff4024e6c5",
+        "isActive": true,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_vlc",
+        "sourceCode": "VLC",
+        "credentialId": "CRED-VLC-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Seed for VLC -> Worldline",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-01T00:00:00+00:00"
+  },
+  {
+    "id": "src-mat-001",
+    "sourceCode": "MAT",
+    "aliases": [
+      "MAT B School"
+    ],
+    "name": "Management Aptitude Test",
+    "department": "CMS",
+    "description": "National Level MBA/PGDM Entrance Examination portal (mat.aima.in)",
+    "isActive": false,
+    "assignedGateway": "CCAVENUE",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://mat.aima.in",
+      "http://localhost:4001"
+    ],
+    "notificationUrl": "https://mat.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "EXAM_FEE",
+      "ADMIT_CARD_FEE"
+    ],
+    "allowedGateways": [
+      "CCAVENUE",
+      "WORLDLINE_PAYNIMO",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "MAT Exam Registration Fee",
+        "gstApplicable": false,
+        "maxAmountPaise": 350000,
+        "minAmountPaise": 210000,
+        "paymentPurpose": "EXAM_FEE"
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "3c72a8361da38012fe0d534b55d46ee7d0b20f03204f6df9fa2b3098240e7a2b",
+        "isActive": true,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_mat",
+        "sourceCode": "MAT",
+        "credentialId": "CRED-MAT-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Demo seed for Phase 3",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      },
+      {
+        "action": "DEACTIVATED",
+        "detail": "Application deactivated by admin",
+        "timestamp": "2026-10-21T09:28:45.272Z",
+        "performedBy": "TEST"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-21T09:28:45.272+00:00"
+  },
+  {
+    "id": "src-cme-001",
+    "sourceCode": "CME",
+    "aliases": [],
+    "name": "Centre for Management Education",
+    "department": "CME",
+    "description": "AICTE Approved PGDM & Executive programs portal (cme.aima.in)",
+    "isActive": true,
+    "assignedGateway": "CCAVENUE",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://cme.aima.in",
+      "http://localhost:4002"
+    ],
+    "notificationUrl": "https://cme.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "SEMESTER_FEE",
+      "ENROLLMENT_FEE",
+      "MATERIAL_FEE"
+    ],
+    "allowedGateways": [
+      "CCAVENUE",
+      "WORLDLINE_PAYNIMO",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "CME Semester Tuition & Examination Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 5000000,
+        "minAmountPaise": 1000000,
+        "paymentPurpose": "SEMESTER_FEE"
+      },
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "CME Admission Enrollment Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 2000000,
+        "minAmountPaise": 500000,
+        "paymentPurpose": "ENROLLMENT_FEE"
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "85dacb4aeb89a986652826a72ffd9fdfa96f66e3804072f00fa766d93c0761a9",
+        "isActive": false,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_cme",
+        "revokedAt": "2026-10-21T09:28:45.279Z",
+        "sourceCode": "CME",
+        "credentialId": "CRED-CME-01"
+      },
+      {
+        "keyHash": "a591d621da9d0eb52526387f2f07c71869ab5ad9da1dedbd3a9018f3b917ef12",
+        "isActive": true,
+        "createdAt": "2026-10-21T09:28:45.279Z",
+        "keyPrefix": "aima_46c",
+        "sourceCode": "CME",
+        "credentialId": "CRED-CME-1792574925279"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Demo seed for Phase 3",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      },
+      {
+        "action": "KEY_ROTATED",
+        "detail": "API key rotated. Old key revoked. New key prefix: aima_46c",
+        "timestamp": "2026-10-21T09:28:45.279Z",
+        "performedBy": "ADMIN_TEST"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-21T09:28:45.279+00:00"
+  },
+  {
+    "id": "src-case-league-001",
+    "sourceCode": "CASE_LEAGUE",
+    "aliases": [
+      "CASE_LEAGUE",
+      "CASE-LEAGUE",
+      "AIMA_QUIZ",
+      "AIMA-QUIZ",
+      "RESEARCH_AIMA",
+      "AIMA_ICRC",
+      "CASELEAGUE",
+      "AMIACRC"
+    ],
+    "name": "AIMA Case League & Olympiad",
+    "department": "Events",
+    "description": "National Management Olympiad & Corporate Case Championship (caseleague.aima.in / aima-quiz)",
+    "isActive": true,
+    "assignedGateway": "CCAVENUE",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://caseleague.aima.in",
+      "http://localhost:4003",
+      "https://aima-quiz.vercel.app",
+      "https://research.aima.in",
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "http://localhost:3001",
+      "http://localhost:3002",
+      "http://localhost:5174",
+      "http://127.0.0.1:3002",
+      "http://0.0.0.0:3002",
+      "http://0.0.0.0:3000"
+    ],
+    "notificationUrl": "https://caseleague.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "REGISTRATION_FEE",
+      "BOOTCAMP_FEE",
+      "TEAM_REGISTRATION",
+      "INSTITUTE_REGISTRATION"
+    ],
+    "allowedGateways": [
+      "CCAVENUE",
+      "WORLDLINE_PAYNIMO",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "Case League Team Registration Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 10000000,
+        "minAmountPaise": 1000,
+        "paymentPurpose": "REGISTRATION_FEE"
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "d8c7a64775258fdcd87a806b194a1f86341b2380498fd81a0e5dea06b70b1856",
+        "isActive": true,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_cas",
+        "sourceCode": "CASE_LEAGUE",
+        "credentialId": "CRED-CASELEAGUE-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Demo seed for Phase 3",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-01T00:00:00+00:00"
+  },
+  {
+    "id": "src-vcc-001",
+    "sourceCode": "AIMA_VCC",
+    "aliases": [
+      "VLC"
+    ],
+    "name": "AIMA Virtual Competency Centre (VCC / VLC)",
+    "department": "VLC",
+    "description": "Virtual Competency Centre and professional micro-credentials",
+    "isActive": true,
+    "assignedGateway": "WORLDLINE_PAYNIMO",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://vcc.aima.in",
+      "https://vlc.aima.in",
+      "http://localhost:4006"
+    ],
+    "notificationUrl": "https://vcc.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "CERTIFICATION_FEE"
+    ],
+    "allowedGateways": [
+      "WORLDLINE_PAYNIMO",
+      "CCAVENUE",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "VCC Micro-Credential Exam & Certification Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 800000,
+        "minAmountPaise": 150000,
+        "paymentPurpose": "CERTIFICATION_FEE"
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "07716a06143a8a05c1fc9c6663d0e24be8d8839eef2826384378d0eee75b9017",
+        "isActive": true,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_vcc",
+        "sourceCode": "AIMA_VCC",
+        "credentialId": "CRED-AIMAVCC-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Demo seed for Phase 3",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-01T00:00:00+00:00"
+  },
+  {
+    "id": "src-events-001",
+    "sourceCode": "AIMA_EVENTS",
+    "aliases": [],
+    "name": "AIMA Events & Conferences",
+    "department": "Events",
+    "description": "National conferences, seminars and events registration",
+    "isActive": true,
+    "assignedGateway": "CCAVENUE",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://events.aima.in",
+      "http://localhost:4008"
+    ],
+    "notificationUrl": "https://events.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "EVENT_REGISTRATION",
+      "DELEGATE_FEE"
+    ],
+    "allowedGateways": [
+      "CCAVENUE",
+      "WORLDLINE_PAYNIMO",
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "VARIABLE",
+        "currency": "INR",
+        "description": "Conference/Event Registration Fee",
+        "gstApplicable": true,
+        "maxAmountPaise": 10000000,
+        "minAmountPaise": 50000,
+        "paymentPurpose": "EVENT_REGISTRATION"
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "2e1a7de713e97b93478b311448d8461f45b7a8314fb43fe6779347c6540050d6",
+        "isActive": true,
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "keyPrefix": "aima_eve",
+        "sourceCode": "AIMA_EVENTS",
+        "credentialId": "CRED-AIMAEVENTS-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Demo seed for Phase 3",
+        "timestamp": "2026-10-01T00:00:00.000Z",
+        "performedBy": "SYSTEM"
+      }
+    ],
+    "createdAt": "2026-10-01T00:00:00+00:00",
+    "updatedAt": "2026-10-01T00:00:00+00:00"
+  },
+  {
+    "id": "src-newaimaportal-1792583195119",
+    "sourceCode": "NEW_AIMA_PORTAL",
+    "aliases": [],
+    "name": "New AIMA Executive Portal",
+    "department": "Corporate",
+    "description": "Dynamic registration test",
+    "isActive": true,
+    "assignedGateway": "WORLDLINE_PAYNIMO",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://newportal.aima.in"
+    ],
+    "notificationUrl": "https://newportal.aima.in/api/v1/payment-notification",
+    "allowedPaymentPurposes": [
+      "REGISTRATION_FEE"
+    ],
+    "allowedGateways": [
+      "WORLDLINE_PAYNIMO"
+    ],
+    "amountRules": [],
+    "credentials": [
+      {
+        "keyHash": "60e07c49ba4910b9d9e83a3d39193ce39eb58d5827ce438790f1120b4c10fe70",
+        "isActive": true,
+        "createdAt": "2026-10-21T11:46:35.119Z",
+        "keyPrefix": "aima_9c4",
+        "sourceCode": "NEW_AIMA_PORTAL",
+        "credentialId": "CRED-NEWAIMAPORTAL-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Application registered with assigned gateway: WORLDLINE_PAYNIMO",
+        "timestamp": "2026-10-21T11:46:35.119Z",
+        "performedBy": "ADMIN"
+      }
+    ],
+    "createdAt": "2026-10-21T11:46:35.119+00:00",
+    "updatedAt": "2026-10-21T11:46:35.119+00:00"
+  },
+  {
+    "id": "src-testapp-1792574925277",
+    "sourceCode": "TEST_APP",
+    "aliases": [],
+    "name": "Test Application",
+    "department": "General",
+    "description": "For testing",
+    "isActive": true,
+    "assignedGateway": "CCAVENUE",
+    "routingMode": "AUTO",
+    "allowedReturnUrls": [
+      "https://test.example.com"
+    ],
+    "notificationUrl": "https://test.example.com/notify",
+    "allowedPaymentPurposes": [
+      "TEST_FEE"
+    ],
+    "allowedGateways": [
+      "DEMO_SIMULATOR"
+    ],
+    "amountRules": [
+      {
+        "mode": "FIXED",
+        "currency": "INR",
+        "description": "Test",
+        "gstApplicable": false,
+        "paymentPurpose": "TEST_FEE",
+        "fixedAmountPaise": 10000
+      }
+    ],
+    "credentials": [
+      {
+        "keyHash": "421a63cd6824982ffd7a9244a2e0350151c6118a46b1d63e0e7fc14a263bc65d",
+        "isActive": true,
+        "createdAt": "2026-10-21T09:28:45.277Z",
+        "keyPrefix": "aima_e81",
+        "sourceCode": "TEST_APP",
+        "credentialId": "CRED-TESTAPP-01"
+      }
+    ],
+    "auditHistory": [
+      {
+        "action": "REGISTERED",
+        "detail": "Application registered with assigned gateway: CCAVENUE",
+        "timestamp": "2026-10-21T09:28:45.277Z",
+        "performedBy": "ADMIN"
+      }
+    ],
+    "createdAt": "2026-10-21T09:28:45.277+00:00",
+    "updatedAt": "2026-10-21T09:28:45.277+00:00"
+  }
+]

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "TXN-20261014-99412",
+    "orderId": "ORD-AIMA-MAT-4410",
+    "applicationId": "mat",
+    "applicationCode": "MAT",
+    "applicationName": "Management Aptitude Test (MAT)",
+    "applicationRef": "MAT-2026-904128",
+    "applicantName": "Aarav Singhania",
+    "applicantEmail": "aarav.singhania@example.com",
+    "applicantPhone": "+91 98112 45890",
+    "courseOrEvent": "MAT September 2026 (Both CBT & PBT)",
+    "feeDescription": "MAT Exam Registration Fee (Dual Mode CBT+PBT)",
+    "baseAmount": 3500,
+    "gstAmount": 0,
+    "totalAmount": 3500,
+    "gatewayAmount": 3500,
+    "currency": "INR",
+    "gateway": "CCAVENUE",
+    "gatewayEnvironment": "sandbox",
+    "isSimulated": false,
+    "status": "SUCCESS",
+    "bankReference": "HDFC-NB-88901234",
+    "authCode": "AUTH-HDFC-99120",
+    "paymentMode": "NetBanking",
+    "bankName": "HDFC Bank",
+    "createdAt": "2026-10-14T09:15:20.000Z",
+    "completedAt": "2026-10-14T09:16:45.000Z",
+    "verifiedAt": "2026-10-14T09:16:45.000Z",
+    "verificationMethod": "HASH_VALIDATION",
+    "idempotencyKey": "SEED-IDEM-MAT-01",
+    "callbackDelivered": true,
+    "callbackResponse": {
+      "httpStatus": 200,
+      "deliveredAt": "2026-10-14T09:16:46.000Z",
+      "targetUrl": "https://mat.aima.in/api/callback/payment-reconcile",
+      "payloadSnippet": "{\"orderId\":\"ORD-AIMA-MAT-4410\",\"status\":\"PAID\",\"admitCardStatus\":\"GENERATED\"}"
+    },
+    "auditTrail": [
+      {
+        "step": "Order Created",
+        "timestamp": "2026-10-14T09:15:20.000Z",
+        "detail": "Application initiated from mat.aima.in",
+        "status": "ok"
+      },
+      {
+        "step": "HDFC Collect Now Checkout",
+        "timestamp": "2026-10-14T09:15:24.000Z",
+        "detail": "Routed via HDFC Collect Now gateway",
+        "status": "ok"
+      },
+      {
+        "step": "Payment Succeeded",
+        "timestamp": "2026-10-14T09:16:45.000Z",
+        "detail": "Bank reference HDFC-NB-88901234 verified",
+        "status": "ok"
+      }
+    ]
+  },
+  {
+    "id": "TXN-ROUTING-002",
+    "orderId": "ORD-AIMA-LMA-902",
+    "applicationId": "src-lma-001",
+    "applicationCode": "LMA",
+    "applicationName": "Local Management Associations",
+    "applicationRef": "LMA-REG-441",
+    "applicantName": "DMA Delegate",
+    "applicantEmail": "dma@lma.in",
+    "applicantPhone": "+91 11 2464 1234",
+    "courseOrEvent": "SUBSCRIPTION_FEE",
+    "feeDescription": "Annual LMA Affiliation",
+    "baseAmount": 20000,
+    "gstAmount": 3600,
+    "totalAmount": 23600,
+    "gatewayAmount": 2,
+    "currency": "INR",
+    "gateway": "WORLDLINE_PAYNIMO",
+    "gatewayEnvironment": "sandbox",
+    "isSimulated": false,
+    "status": "PENDING",
+    "createdAt": "2026-10-21T12:14:57.125Z",
+    "idempotencyKey": "IDEM-LMA-002",
+    "callbackDelivered": false,
+    "auditTrail": []
+  }
+]
