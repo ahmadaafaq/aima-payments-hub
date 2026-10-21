@@ -2104,6 +2104,10 @@ var ServerTransactionStore = class {
             idempotencyKey: row.idempotency_key || `IDEM-${row.id}`,
             callbackDelivered: Boolean(row.callback_delivered),
             callbackResponse: row.callback_response,
+            sessionToken: row.session_token || void 0,
+            returnUrl: row.return_url || void 0,
+            externalOrderId: row.external_order_id || void 0,
+            paymentPurpose: row.payment_purpose || void 0,
             auditTrail: Array.isArray(row.audit_trail) ? row.audit_trail : []
           };
           this.transactions.set(txn.id, txn);
@@ -2144,6 +2148,10 @@ var ServerTransactionStore = class {
         gateway_transaction_id: txn.gatewayTransactionId || null,
         gateway_status_code: txn.gatewayStatusCode || null,
         idempotency_key: txn.idempotencyKey,
+        session_token: txn.sessionToken || null,
+        return_url: txn.returnUrl || null,
+        external_order_id: txn.externalOrderId || null,
+        payment_purpose: txn.paymentPurpose || null,
         verification_method: txn.verificationMethod || null,
         callback_delivered: txn.callbackDelivered,
         callback_response: txn.callbackResponse || null,
@@ -2218,6 +2226,63 @@ var ServerTransactionStore = class {
   }
   getByOrderId(orderId) {
     return Array.from(this.transactions.values()).find((t) => t.orderId === orderId);
+  }
+  getBySessionToken(token) {
+    return Array.from(this.transactions.values()).find((t) => t.sessionToken === token);
+  }
+  async fetchBySessionToken(token) {
+    const existing = this.getBySessionToken(token);
+    if (existing) return existing;
+    try {
+      const { data, error } = await supabaseAdmin.from("aima_payment_transactions").select("*").eq("session_token", token).single();
+      if (!error && data) {
+        const txn = {
+          id: data.id,
+          orderId: data.order_id,
+          applicationId: data.application_id,
+          applicationCode: data.application_code,
+          applicationName: data.application_name,
+          applicationRef: data.application_ref || "",
+          applicantName: data.applicant_name,
+          applicantEmail: data.applicant_email,
+          applicantPhone: data.applicant_phone || "",
+          courseOrEvent: data.course_or_event || "",
+          feeDescription: data.fee_description || "",
+          baseAmount: Number(data.base_amount || 0),
+          gstAmount: Number(data.gst_amount || 0),
+          totalAmount: Number(data.total_amount || 0),
+          gatewayAmount: Number(data.gateway_amount || data.total_amount || 0),
+          currency: data.currency || "INR",
+          gateway: data.gateway,
+          gatewayEnvironment: data.gateway_environment || "sandbox",
+          isSimulated: Boolean(data.is_simulated),
+          status: data.status,
+          statusReason: data.status_reason,
+          bankReference: data.bank_reference,
+          authCode: data.auth_code,
+          paymentMode: data.payment_mode,
+          bankName: data.bank_name,
+          gatewayTransactionId: data.gateway_transaction_id,
+          gatewayStatusCode: data.gateway_status_code,
+          createdAt: data.created_at,
+          completedAt: data.completed_at,
+          verifiedAt: data.verified_at,
+          verificationMethod: data.verification_method || "HASH_VALIDATION",
+          idempotencyKey: data.idempotency_key || `IDEM-${data.id}`,
+          callbackDelivered: Boolean(data.callback_delivered),
+          callbackResponse: data.callback_response,
+          sessionToken: data.session_token || void 0,
+          returnUrl: data.return_url || void 0,
+          externalOrderId: data.external_order_id || void 0,
+          paymentPurpose: data.payment_purpose || void 0,
+          auditTrail: Array.isArray(data.audit_trail) ? data.audit_trail : []
+        };
+        this.transactions.set(txn.id, txn);
+        return txn;
+      }
+    } catch {
+    }
+    return void 0;
   }
   getBySourceCode(sourceCode) {
     return Array.from(this.transactions.values()).filter(
@@ -2408,6 +2473,27 @@ var PaymentSessionStore = class {
     const session = {
       ...params,
       sessionToken: this.generateToken(),
+      status: "PENDING",
+      createdAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      lastActivityAt: now.toISOString()
+    };
+    this.sessions.set(session.sessionToken, session);
+    this.idempotencyIndex.set(params.idempotencyKey, session.sessionToken);
+    return session;
+  }
+  /**
+   * Register or restore a session with a predetermined token (e.g. from database persistence).
+   */
+  createWithToken(params) {
+    const existing = this.sessions.get(params.sessionToken);
+    if (existing && !this.isExpired(existing)) {
+      return existing;
+    }
+    const now = /* @__PURE__ */ new Date();
+    const expiresAt = new Date(now.getTime() + SESSION_TTL_MINUTES * 60 * 1e3);
+    const session = {
+      ...params,
       status: "PENDING",
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
@@ -3315,7 +3401,6 @@ function handleCommonPay(req, res) {
       }
     ]
   };
-  serverTransactionStore.save(transaction);
   const session = paymentSessionStore.create({
     transactionId: txnId,
     orderId,
@@ -3333,6 +3418,11 @@ function handleCommonPay(req, res) {
     routingMode: gatewayResolution.routingMode,
     idempotencyKey: transaction.idempotencyKey
   });
+  transaction.sessionToken = session.sessionToken;
+  transaction.returnUrl = returnUrl;
+  transaction.externalOrderId = reference || orderId;
+  transaction.paymentPurpose = paymentPurpose;
+  serverTransactionStore.save(transaction);
   const checkoutUrl = resolveCheckoutUrl(req, session.sessionToken);
   if (isJson) {
     return res.status(201).json({
@@ -3487,7 +3577,6 @@ v1Router.post("/payment-sessions", hmacAuthMiddleware, (req, res) => {
       }
     ]
   };
-  serverTransactionStore.save(transaction);
   let session;
   try {
     session = paymentSessionStore.create({
@@ -3511,6 +3600,11 @@ v1Router.post("/payment-sessions", hmacAuthMiddleware, (req, res) => {
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
+  transaction.sessionToken = session.sessionToken;
+  transaction.returnUrl = returnUrl;
+  transaction.externalOrderId = externalOrderId;
+  transaction.paymentPurpose = paymentPurpose;
+  serverTransactionStore.save(transaction);
   const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
   const checkoutUrl = `${appUrl}/checkout/${session.sessionToken}`;
   return res.status(201).json({
@@ -3558,9 +3652,33 @@ v1Router.get("/payments/:orderId", hmacAuthMiddleware, (req, res) => {
     updatedAt: txn.completedAt || txn.createdAt
   });
 });
-v1Router.get("/session/:token", (req, res) => {
+v1Router.get("/session/:token", async (req, res) => {
   const token = req.params.token;
-  const session = paymentSessionStore.getByToken(token);
+  let session = paymentSessionStore.getByToken(token);
+  if (!session) {
+    const storedTxn = await serverTransactionStore.fetchBySessionToken(token);
+    if (storedTxn) {
+      const app3 = sourceApplicationRegistry.getBySourceCode(storedTxn.applicationCode);
+      session = paymentSessionStore.createWithToken({
+        sessionToken: token,
+        transactionId: storedTxn.id,
+        orderId: storedTxn.orderId,
+        sourceCode: storedTxn.applicationCode,
+        externalOrderId: storedTxn.applicationRef || storedTxn.orderId,
+        applicationReference: storedTxn.applicationRef || storedTxn.orderId,
+        paymentPurpose: storedTxn.courseOrEvent || storedTxn.feeDescription || "REGISTRATION_FEE",
+        amountPaise: Math.round(storedTxn.totalAmount * 100),
+        currency: "INR",
+        customerName: storedTxn.applicantName,
+        customerEmail: storedTxn.applicantEmail,
+        customerPhone: storedTxn.applicantPhone,
+        returnUrl: storedTxn.returnUrl || "https://research.aima.in/registration",
+        selectedGateway: storedTxn.gateway,
+        routingMode: app3?.routingMode || "AUTO",
+        idempotencyKey: storedTxn.idempotencyKey
+      });
+    }
+  }
   if (!session) {
     const expiredSession = paymentSessionStore.getAnyByToken(token);
     if (expiredSession) {

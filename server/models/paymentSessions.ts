@@ -98,6 +98,31 @@ export class PaymentSessionStore {
     return session;
   }
 
+  /**
+   * Register or restore a session with a predetermined token (e.g. from database persistence).
+   */
+  public createWithToken(params: Omit<PaymentSession, 'status' | 'createdAt' | 'expiresAt' | 'lastActivityAt'>): PaymentSession {
+    const existing = this.sessions.get(params.sessionToken);
+    if (existing && !this.isExpired(existing)) {
+      return existing;
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + SESSION_TTL_MINUTES * 60 * 1000);
+
+    const session: PaymentSession = {
+      ...params,
+      status: 'PENDING',
+      createdAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      lastActivityAt: now.toISOString(),
+    };
+
+    this.sessions.set(session.sessionToken, session);
+    this.idempotencyIndex.set(params.idempotencyKey, session.sessionToken);
+    return session;
+  }
+
   /** Retrieve session by token. Returns undefined if not found or expired. */
   public getByToken(token: string): PaymentSession | undefined {
     const session = this.sessions.get(token);

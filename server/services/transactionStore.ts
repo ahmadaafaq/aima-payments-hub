@@ -120,6 +120,10 @@ export class ServerTransactionStore {
             idempotencyKey: row.idempotency_key || `IDEM-${row.id}`,
             callbackDelivered: Boolean(row.callback_delivered),
             callbackResponse: row.callback_response,
+            sessionToken: row.session_token || undefined,
+            returnUrl: row.return_url || undefined,
+            externalOrderId: row.external_order_id || undefined,
+            paymentPurpose: row.payment_purpose || undefined,
             auditTrail: Array.isArray(row.audit_trail) ? row.audit_trail : [],
           };
           this.transactions.set(txn.id, txn);
@@ -163,6 +167,10 @@ export class ServerTransactionStore {
         gateway_transaction_id: txn.gatewayTransactionId || null,
         gateway_status_code: txn.gatewayStatusCode || null,
         idempotency_key: txn.idempotencyKey,
+        session_token: txn.sessionToken || null,
+        return_url: txn.returnUrl || null,
+        external_order_id: txn.externalOrderId || null,
+        payment_purpose: txn.paymentPurpose || null,
         verification_method: txn.verificationMethod || null,
         callback_delivered: txn.callbackDelivered,
         callback_response: txn.callbackResponse || null,
@@ -246,6 +254,70 @@ export class ServerTransactionStore {
 
   public getByOrderId(orderId: string): ServerTransaction | undefined {
     return Array.from(this.transactions.values()).find((t) => t.orderId === orderId);
+  }
+
+  public getBySessionToken(token: string): ServerTransaction | undefined {
+    return Array.from(this.transactions.values()).find((t) => t.sessionToken === token);
+  }
+
+  public async fetchBySessionToken(token: string): Promise<ServerTransaction | undefined> {
+    const existing = this.getBySessionToken(token);
+    if (existing) return existing;
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('aima_payment_transactions')
+        .select('*')
+        .eq('session_token', token)
+        .single();
+      if (!error && data) {
+        const txn: ServerTransaction = {
+          id: data.id,
+          orderId: data.order_id,
+          applicationId: data.application_id,
+          applicationCode: data.application_code,
+          applicationName: data.application_name,
+          applicationRef: data.application_ref || '',
+          applicantName: data.applicant_name,
+          applicantEmail: data.applicant_email,
+          applicantPhone: data.applicant_phone || '',
+          courseOrEvent: data.course_or_event || '',
+          feeDescription: data.fee_description || '',
+          baseAmount: Number(data.base_amount || 0),
+          gstAmount: Number(data.gst_amount || 0),
+          totalAmount: Number(data.total_amount || 0),
+          gatewayAmount: Number(data.gateway_amount || data.total_amount || 0),
+          currency: data.currency || 'INR',
+          gateway: data.gateway,
+          gatewayEnvironment: data.gateway_environment || 'sandbox',
+          isSimulated: Boolean(data.is_simulated),
+          status: data.status,
+          statusReason: data.status_reason,
+          bankReference: data.bank_reference,
+          authCode: data.auth_code,
+          paymentMode: data.payment_mode,
+          bankName: data.bank_name,
+          gatewayTransactionId: data.gateway_transaction_id,
+          gatewayStatusCode: data.gateway_status_code,
+          createdAt: data.created_at,
+          completedAt: data.completed_at,
+          verifiedAt: data.verified_at,
+          verificationMethod: data.verification_method || 'HASH_VALIDATION',
+          idempotencyKey: data.idempotency_key || `IDEM-${data.id}`,
+          callbackDelivered: Boolean(data.callback_delivered),
+          callbackResponse: data.callback_response,
+          sessionToken: data.session_token || undefined,
+          returnUrl: data.return_url || undefined,
+          externalOrderId: data.external_order_id || undefined,
+          paymentPurpose: data.payment_purpose || undefined,
+          auditTrail: Array.isArray(data.audit_trail) ? data.audit_trail : [],
+        };
+        this.transactions.set(txn.id, txn);
+        return txn;
+      }
+    } catch {
+      // Supabase query error fallback
+    }
+    return undefined;
   }
 
   public getBySourceCode(sourceCode: string): ServerTransaction[] {

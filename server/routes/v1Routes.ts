@@ -312,8 +312,6 @@ export function handleCommonPay(req: Request, res: Response): any {
     ],
   };
 
-  serverTransactionStore.save(transaction);
-
   // 7. Create payment session
   const session = paymentSessionStore.create({
     transactionId: txnId,
@@ -332,6 +330,12 @@ export function handleCommonPay(req: Request, res: Response): any {
     routingMode: gatewayResolution.routingMode,
     idempotencyKey: transaction.idempotencyKey,
   });
+
+  transaction.sessionToken = session.sessionToken;
+  transaction.returnUrl = returnUrl;
+  transaction.externalOrderId = reference || orderId;
+  transaction.paymentPurpose = paymentPurpose;
+  serverTransactionStore.save(transaction);
 
   const checkoutUrl = resolveCheckoutUrl(req, session.sessionToken);
 
@@ -529,8 +533,6 @@ v1Router.post('/payment-sessions', hmacAuthMiddleware, (req: Request, res: Respo
     ],
   };
 
-  serverTransactionStore.save(transaction);
-
   // ── Create payment session ─────────────────────────────────────────────────
   let session;
   try {
@@ -555,6 +557,12 @@ v1Router.post('/payment-sessions', hmacAuthMiddleware, (req: Request, res: Respo
   } catch (err: any) {
     return res.status(400).json({ error: err.message });
   }
+
+  transaction.sessionToken = session.sessionToken;
+  transaction.returnUrl = returnUrl;
+  transaction.externalOrderId = externalOrderId;
+  transaction.paymentPurpose = paymentPurpose;
+  serverTransactionStore.save(transaction);
 
   const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
   const checkoutUrl = `${appUrl}/checkout/${session.sessionToken}`;
@@ -627,9 +635,34 @@ v1Router.get('/payments/:orderId', hmacAuthMiddleware, (req: Request, res: Respo
  * Internal: resolve payment session for checkout page.
  * Returns session details + order details + auto-resolved gateway.
  */
-v1Router.get('/session/:token', (req: Request, res: Response): any => {
+v1Router.get('/session/:token', async (req: Request, res: Response): Promise<any> => {
   const token = req.params.token;
-  const session = paymentSessionStore.getByToken(token);
+  let session = paymentSessionStore.getByToken(token);
+
+  if (!session) {
+    const storedTxn = await serverTransactionStore.fetchBySessionToken(token);
+    if (storedTxn) {
+      const app = sourceApplicationRegistry.getBySourceCode(storedTxn.applicationCode);
+      session = paymentSessionStore.createWithToken({
+        sessionToken: token,
+        transactionId: storedTxn.id,
+        orderId: storedTxn.orderId,
+        sourceCode: storedTxn.applicationCode,
+        externalOrderId: storedTxn.applicationRef || storedTxn.orderId,
+        applicationReference: storedTxn.applicationRef || storedTxn.orderId,
+        paymentPurpose: storedTxn.courseOrEvent || storedTxn.feeDescription || 'REGISTRATION_FEE',
+        amountPaise: Math.round(storedTxn.totalAmount * 100),
+        currency: 'INR',
+        customerName: storedTxn.applicantName,
+        customerEmail: storedTxn.applicantEmail,
+        customerPhone: storedTxn.applicantPhone,
+        returnUrl: storedTxn.returnUrl || 'https://research.aima.in/registration',
+        selectedGateway: storedTxn.gateway as any,
+        routingMode: app?.routingMode || 'AUTO',
+        idempotencyKey: storedTxn.idempotencyKey,
+      });
+    }
+  }
 
   if (!session) {
     const expiredSession = paymentSessionStore.getAnyByToken(token);

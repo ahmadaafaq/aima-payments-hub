@@ -740,5 +740,49 @@
         "timestamp": "2026-10-21T13:32:47.301Z"
       }
     ]
+  },
+  {
+    "id": "TXN-20261021-86368",
+    "orderId": "ORD-AIMA-CASELEAGUE-2705",
+    "applicationId": "src-case-league-001",
+    "applicationCode": "CASE_LEAGUE",
+    "applicationName": "AIMA Case League & Olympiad",
+    "applicationRef": "AIMA-CL26-94564",
+    "applicantName": "Deepak Test",
+    "applicantEmail": "admin@test.com",
+    "applicantPhone": "",
+    "courseOrEvent": "CASE_LEAGUE_REGISTRATION",
+    "feeDescription": "CASE_LEAGUE_REGISTRATION",
+    "baseAmount": 200,
+    "gstAmount": 0,
+    "totalAmount": 200,
+    "gatewayAmount": 200,
+    "currency": "INR",
+    "gateway": "CCAVENUE",
+    "gatewayEnvironment": "sandbox",
+    "isSimulated": false,
+    "status": "PENDING",
+    "statusReason": null,
+    "bankReference": null,
+    "authCode": null,
+    "paymentMode": null,
+    "bankName": null,
+    "gatewayTransactionId": null,
+    "gatewayStatusCode": null,
+    "createdAt": "2026-10-21T13:49:15.614+00:00",
+    "completedAt": null,
+    "verifiedAt": null,
+    "verificationMethod": "HASH_VALIDATION",
+    "idempotencyKey": "PAY-1792590555614-lc8srl",
+    "callbackDelivered": false,
+    "callbackResponse": null,
+    "auditTrail": [
+      {
+        "step": "Common Pay Order Initiated",
+        "detail": "Initiated via /pay URL. Source: CASE_LEAGUE (Events). Auto-resolved Gateway: CCAVENUE (Mode: AUTO). Ref: AIMA-CL26-94564",
+        "status": "ok",
+        "timestamp": "2026-10-21T13:49:15.614Z"
+      }
+    ]
   }
 ]

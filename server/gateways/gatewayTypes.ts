@@ -82,6 +82,10 @@ export interface ServerTransaction {
     targetUrl: string;
     payloadSnippet: string;
   };
+  sessionToken?: string;
+  returnUrl?: string;
+  externalOrderId?: string;
+  paymentPurpose?: string;
   auditTrail: {
     step: string;
     timestamp: string;
