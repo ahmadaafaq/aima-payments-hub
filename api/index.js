@@ -3139,9 +3139,12 @@ function resolveCheckoutUrl(req, sessionToken) {
   if (process.env.APP_URL) {
     return `${process.env.APP_URL.replace(/\/$/, "")}/checkout/${sessionToken}`;
   }
-  const host = req.headers["x-forwarded-host"] || req.get("host") || "aima-payments-hub.vercel.app";
-  const proto = host.includes("localhost") || host.includes("127.0.0.1") ? req.protocol || "http" : "https";
-  return `${proto}://${host}/checkout/${sessionToken}`;
+  const host = req.headers["x-forwarded-host"] || req.get("host") || "";
+  if (host.includes("localhost") || host.includes("127.0.0.1")) {
+    const proto = req.protocol || "http";
+    return `${proto}://${host}/checkout/${sessionToken}`;
+  }
+  return `https://aima-payments-hub.vercel.app/checkout/${sessionToken}`;
 }
 function handleCommonPay(req, res) {
   const sourceCode = (req.query.source || req.query.app || req.query.project_code || "").trim();

@@ -706,7 +706,6 @@
     "notificationUrl": "https://caseleague.aima.in/api/v1/payment-notification",
     "allowedPaymentPurposes": [
       "REGISTRATION_FEE",
-      "CASE_LEAGUE_REGISTRATION",
       "BOOTCAMP_FEE",
       "TEAM_REGISTRATION",
       "INSTITUTE_REGISTRATION"
@@ -725,15 +724,6 @@
         "maxAmountPaise": 10000000,
         "minAmountPaise": 1000,
         "paymentPurpose": "REGISTRATION_FEE"
-      },
-      {
-        "mode": "VARIABLE",
-        "currency": "INR",
-        "description": "Case League Registration Fee",
-        "gstApplicable": true,
-        "maxAmountPaise": 10000000,
-        "minAmountPaise": 1000,
-        "paymentPurpose": "CASE_LEAGUE_REGISTRATION"
       }
     ],
     "credentials": [

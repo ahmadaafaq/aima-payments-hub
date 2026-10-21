@@ -99,9 +99,12 @@ function resolveCheckoutUrl(req: Request, sessionToken: string): string {
   if (process.env.APP_URL) {
     return `${process.env.APP_URL.replace(/\/$/, '')}/checkout/${sessionToken}`;
   }
-  const host = (req.headers['x-forwarded-host'] as string) || req.get('host') || 'aima-payments-hub.vercel.app';
-  const proto = host.includes('localhost') || host.includes('127.0.0.1') ? (req.protocol || 'http') : 'https';
-  return `${proto}://${host}/checkout/${sessionToken}`;
+  const host = (req.headers['x-forwarded-host'] as string) || req.get('host') || '';
+  if (host.includes('localhost') || host.includes('127.0.0.1')) {
+    const proto = req.protocol || 'http';
+    return `${proto}://${host}/checkout/${sessionToken}`;
+  }
+  return `https://aima-payments-hub.vercel.app/checkout/${sessionToken}`;
 }
 
 // ─── Common Payment Initiation URL Handler (/pay) ─────────────────────────────
