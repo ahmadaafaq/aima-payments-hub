@@ -35,7 +35,7 @@ app.get(['/health', '/api/health'], (_req: Request, res: Response) => {
     status: 'ok',
     time: new Date().toISOString(),
     platform: 'vercel-serverless',
-    version: '3.0',
+    version: '3.1',
   });
 });
 
