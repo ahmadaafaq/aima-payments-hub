@@ -374,6 +374,8 @@ export default function App() {
           const callbackParams = new URLSearchParams();
           if (sessionReturnUrl) callbackParams.set('returnUrl', sessionReturnUrl);
           if (activeSessionToken) callbackParams.set('token', activeSessionToken);
+          callbackParams.set('transactionId', newTxn.id);
+          callbackParams.set('orderId', newTxn.orderId);
           const callbackQuery = callbackParams.toString() ? `?${callbackParams.toString()}` : '';
           const callbackUrl = `${window.location.origin}/api/payments/hdfc-collectnow/callback${callbackQuery}`;
           const form = document.createElement('form');
@@ -390,6 +392,7 @@ export default function App() {
             'prefill[email]': selectedApplicant.email,
             'prefill[contact]': selectedApplicant.phone.replace(/[^0-9]/g, '').slice(-10) || '9876543210',
             'notes[transaction_id]': newTxn.id,
+            'notes[order_id]': newTxn.orderId,
             'notes[application_ref]': selectedApplicant.refNo,
             callback_url: callbackUrl,
           };

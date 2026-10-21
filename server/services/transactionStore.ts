@@ -260,6 +260,88 @@ export class ServerTransactionStore {
     return Array.from(this.transactions.values()).find((t) => t.sessionToken === token);
   }
 
+  private mapRowToTxn(data: any): ServerTransaction {
+    return {
+      id: data.id,
+      orderId: data.order_id,
+      applicationId: data.application_id,
+      applicationCode: data.application_code,
+      applicationName: data.application_name,
+      applicationRef: data.application_ref || '',
+      applicantName: data.applicant_name,
+      applicantEmail: data.applicant_email,
+      applicantPhone: data.applicant_phone || '',
+      courseOrEvent: data.course_or_event || '',
+      feeDescription: data.fee_description || '',
+      baseAmount: Number(data.base_amount || 0),
+      gstAmount: Number(data.gst_amount || 0),
+      totalAmount: Number(data.total_amount || 0),
+      gatewayAmount: Number(data.gateway_amount || data.total_amount || 0),
+      currency: data.currency || 'INR',
+      gateway: data.gateway,
+      gatewayEnvironment: data.gateway_environment || 'sandbox',
+      isSimulated: Boolean(data.is_simulated),
+      status: data.status,
+      statusReason: data.status_reason,
+      bankReference: data.bank_reference,
+      authCode: data.auth_code,
+      paymentMode: data.payment_mode,
+      bankName: data.bank_name,
+      gatewayTransactionId: data.gateway_transaction_id,
+      gatewayStatusCode: data.gateway_status_code,
+      createdAt: data.created_at,
+      completedAt: data.completed_at,
+      verifiedAt: data.verified_at,
+      verificationMethod: data.verification_method || 'HASH_VALIDATION',
+      idempotencyKey: data.idempotency_key || `IDEM-${data.id}`,
+      callbackDelivered: Boolean(data.callback_delivered),
+      callbackResponse: data.callback_response,
+      sessionToken: data.session_token || undefined,
+      returnUrl: data.return_url || undefined,
+      externalOrderId: data.external_order_id || undefined,
+      paymentPurpose: data.payment_purpose || undefined,
+      auditTrail: Array.isArray(data.audit_trail) ? data.audit_trail : [],
+    };
+  }
+
+  public async fetchById(id: string): Promise<ServerTransaction | undefined> {
+    const existing = this.getById(id);
+    if (existing) return existing;
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('aima_payment_transactions')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (!error && data) {
+        const txn = this.mapRowToTxn(data);
+        this.transactions.set(txn.id, txn);
+        return txn;
+      }
+    } catch {}
+    return undefined;
+  }
+
+  public async fetchByOrderId(orderId: string): Promise<ServerTransaction | undefined> {
+    const existing = this.getByOrderId(orderId) || Array.from(this.transactions.values()).find(
+      (t) => t.gatewayTransactionId === orderId
+    );
+    if (existing) return existing;
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('aima_payment_transactions')
+        .select('*')
+        .or(`order_id.eq.${orderId},gateway_transaction_id.eq.${orderId}`)
+        .maybeSingle();
+      if (!error && data) {
+        const txn = this.mapRowToTxn(data);
+        this.transactions.set(txn.id, txn);
+        return txn;
+      }
+    } catch {}
+    return undefined;
+  }
+
   public async fetchBySessionToken(token: string): Promise<ServerTransaction | undefined> {
     const existing = this.getBySessionToken(token);
     if (existing) return existing;
@@ -270,47 +352,7 @@ export class ServerTransactionStore {
         .eq('session_token', token)
         .maybeSingle();
       if (!error && data) {
-        const txn: ServerTransaction = {
-          id: data.id,
-          orderId: data.order_id,
-          applicationId: data.application_id,
-          applicationCode: data.application_code,
-          applicationName: data.application_name,
-          applicationRef: data.application_ref || '',
-          applicantName: data.applicant_name,
-          applicantEmail: data.applicant_email,
-          applicantPhone: data.applicant_phone || '',
-          courseOrEvent: data.course_or_event || '',
-          feeDescription: data.fee_description || '',
-          baseAmount: Number(data.base_amount || 0),
-          gstAmount: Number(data.gst_amount || 0),
-          totalAmount: Number(data.total_amount || 0),
-          gatewayAmount: Number(data.gateway_amount || data.total_amount || 0),
-          currency: data.currency || 'INR',
-          gateway: data.gateway,
-          gatewayEnvironment: data.gateway_environment || 'sandbox',
-          isSimulated: Boolean(data.is_simulated),
-          status: data.status,
-          statusReason: data.status_reason,
-          bankReference: data.bank_reference,
-          authCode: data.auth_code,
-          paymentMode: data.payment_mode,
-          bankName: data.bank_name,
-          gatewayTransactionId: data.gateway_transaction_id,
-          gatewayStatusCode: data.gateway_status_code,
-          createdAt: data.created_at,
-          completedAt: data.completed_at,
-          verifiedAt: data.verified_at,
-          verificationMethod: data.verification_method || 'HASH_VALIDATION',
-          idempotencyKey: data.idempotency_key || `IDEM-${data.id}`,
-          callbackDelivered: Boolean(data.callback_delivered),
-          callbackResponse: data.callback_response,
-          sessionToken: data.session_token || undefined,
-          returnUrl: data.return_url || undefined,
-          externalOrderId: data.external_order_id || undefined,
-          paymentPurpose: data.payment_purpose || undefined,
-          auditTrail: Array.isArray(data.audit_trail) ? data.audit_trail : [],
-        };
+        const txn = this.mapRowToTxn(data);
         this.transactions.set(txn.id, txn);
         return txn;
       }

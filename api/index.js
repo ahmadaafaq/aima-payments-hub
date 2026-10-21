@@ -2230,53 +2230,86 @@ var ServerTransactionStore = class {
   getBySessionToken(token) {
     return Array.from(this.transactions.values()).find((t) => t.sessionToken === token);
   }
+  mapRowToTxn(data) {
+    return {
+      id: data.id,
+      orderId: data.order_id,
+      applicationId: data.application_id,
+      applicationCode: data.application_code,
+      applicationName: data.application_name,
+      applicationRef: data.application_ref || "",
+      applicantName: data.applicant_name,
+      applicantEmail: data.applicant_email,
+      applicantPhone: data.applicant_phone || "",
+      courseOrEvent: data.course_or_event || "",
+      feeDescription: data.fee_description || "",
+      baseAmount: Number(data.base_amount || 0),
+      gstAmount: Number(data.gst_amount || 0),
+      totalAmount: Number(data.total_amount || 0),
+      gatewayAmount: Number(data.gateway_amount || data.total_amount || 0),
+      currency: data.currency || "INR",
+      gateway: data.gateway,
+      gatewayEnvironment: data.gateway_environment || "sandbox",
+      isSimulated: Boolean(data.is_simulated),
+      status: data.status,
+      statusReason: data.status_reason,
+      bankReference: data.bank_reference,
+      authCode: data.auth_code,
+      paymentMode: data.payment_mode,
+      bankName: data.bank_name,
+      gatewayTransactionId: data.gateway_transaction_id,
+      gatewayStatusCode: data.gateway_status_code,
+      createdAt: data.created_at,
+      completedAt: data.completed_at,
+      verifiedAt: data.verified_at,
+      verificationMethod: data.verification_method || "HASH_VALIDATION",
+      idempotencyKey: data.idempotency_key || `IDEM-${data.id}`,
+      callbackDelivered: Boolean(data.callback_delivered),
+      callbackResponse: data.callback_response,
+      sessionToken: data.session_token || void 0,
+      returnUrl: data.return_url || void 0,
+      externalOrderId: data.external_order_id || void 0,
+      paymentPurpose: data.payment_purpose || void 0,
+      auditTrail: Array.isArray(data.audit_trail) ? data.audit_trail : []
+    };
+  }
+  async fetchById(id) {
+    const existing = this.getById(id);
+    if (existing) return existing;
+    try {
+      const { data, error } = await supabaseAdmin.from("aima_payment_transactions").select("*").eq("id", id).maybeSingle();
+      if (!error && data) {
+        const txn = this.mapRowToTxn(data);
+        this.transactions.set(txn.id, txn);
+        return txn;
+      }
+    } catch {
+    }
+    return void 0;
+  }
+  async fetchByOrderId(orderId) {
+    const existing = this.getByOrderId(orderId) || Array.from(this.transactions.values()).find(
+      (t) => t.gatewayTransactionId === orderId
+    );
+    if (existing) return existing;
+    try {
+      const { data, error } = await supabaseAdmin.from("aima_payment_transactions").select("*").or(`order_id.eq.${orderId},gateway_transaction_id.eq.${orderId}`).maybeSingle();
+      if (!error && data) {
+        const txn = this.mapRowToTxn(data);
+        this.transactions.set(txn.id, txn);
+        return txn;
+      }
+    } catch {
+    }
+    return void 0;
+  }
   async fetchBySessionToken(token) {
     const existing = this.getBySessionToken(token);
     if (existing) return existing;
     try {
       const { data, error } = await supabaseAdmin.from("aima_payment_transactions").select("*").eq("session_token", token).maybeSingle();
       if (!error && data) {
-        const txn = {
-          id: data.id,
-          orderId: data.order_id,
-          applicationId: data.application_id,
-          applicationCode: data.application_code,
-          applicationName: data.application_name,
-          applicationRef: data.application_ref || "",
-          applicantName: data.applicant_name,
-          applicantEmail: data.applicant_email,
-          applicantPhone: data.applicant_phone || "",
-          courseOrEvent: data.course_or_event || "",
-          feeDescription: data.fee_description || "",
-          baseAmount: Number(data.base_amount || 0),
-          gstAmount: Number(data.gst_amount || 0),
-          totalAmount: Number(data.total_amount || 0),
-          gatewayAmount: Number(data.gateway_amount || data.total_amount || 0),
-          currency: data.currency || "INR",
-          gateway: data.gateway,
-          gatewayEnvironment: data.gateway_environment || "sandbox",
-          isSimulated: Boolean(data.is_simulated),
-          status: data.status,
-          statusReason: data.status_reason,
-          bankReference: data.bank_reference,
-          authCode: data.auth_code,
-          paymentMode: data.payment_mode,
-          bankName: data.bank_name,
-          gatewayTransactionId: data.gateway_transaction_id,
-          gatewayStatusCode: data.gateway_status_code,
-          createdAt: data.created_at,
-          completedAt: data.completed_at,
-          verifiedAt: data.verified_at,
-          verificationMethod: data.verification_method || "HASH_VALIDATION",
-          idempotencyKey: data.idempotency_key || `IDEM-${data.id}`,
-          callbackDelivered: Boolean(data.callback_delivered),
-          callbackResponse: data.callback_response,
-          sessionToken: data.session_token || void 0,
-          returnUrl: data.return_url || void 0,
-          externalOrderId: data.external_order_id || void 0,
-          paymentPurpose: data.payment_purpose || void 0,
-          auditTrail: Array.isArray(data.audit_trail) ? data.audit_trail : []
-        };
+        const txn = this.mapRowToTxn(data);
         this.transactions.set(txn.id, txn);
         return txn;
       }
@@ -2833,69 +2866,65 @@ paymentRouter.post("/payments/hdfc-collectnow/cancel", async (req, res) => {
     transaction: updatedTxn
   });
 });
-paymentRouter.post("/payments/hdfc-collectnow/callback", async (req, res) => {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    return res.status(400).send("Missing required payment parameters from HDFC Collect Now callback.");
+paymentRouter.all(["/payments/hdfc-collectnow/callback", "/payments/hdfc-collectnow/callback/"], async (req, res) => {
+  const body = req.body || {};
+  const query = req.query || {};
+  const razorpay_order_id = body.razorpay_order_id || body?.error?.metadata?.order_id || body?.["error[metadata][order_id]"] || query.order_id || query.orderId || query.razorpay_order_id || "";
+  const razorpay_payment_id = body.razorpay_payment_id || body?.error?.metadata?.payment_id || body?.["error[metadata][payment_id]"] || query.payment_id || query.razorpay_payment_id || "";
+  const razorpay_signature = body.razorpay_signature || query.razorpay_signature || "";
+  const tokenParam = (query.token || body.token || "").trim();
+  const transactionId = (query.transactionId || body.transactionId || body["notes[transaction_id]"] || body?.notes?.transaction_id || "").trim();
+  const rawTargetReturnUrl = (query.returnUrl || body.returnUrl || "").trim();
+  const errorObj = body.error || {};
+  const errorCode = errorObj.code || body["error[code]"] || query.error_code || "";
+  const errorDescription = errorObj.description || body["error[description]"] || errorObj.reason || body["error[reason]"] || query.error_description || query.reason || "";
+  const isFailure = Boolean(errorCode || errorDescription || !razorpay_signature && !razorpay_payment_id);
+  let txn;
+  if (transactionId) {
+    txn = await serverTransactionStore.fetchById(transactionId);
   }
-  const allTxns = serverTransactionStore.getAll();
-  const txn = allTxns.find(
-    (t) => t.gatewayTransactionId === razorpay_order_id || t.orderId === razorpay_order_id
-  );
-  if (!txn) {
-    return res.status(404).send(`Order ${razorpay_order_id} not found in transaction ledger.`);
+  if (!txn && tokenParam) {
+    txn = await serverTransactionStore.fetchBySessionToken(tokenParam);
   }
-  const verification = await hdfcCollectNowAdapter.verifyPayment({
-    orderId: razorpay_order_id,
-    paymentId: razorpay_payment_id,
-    signature: razorpay_signature
-  });
-  const updatedTxn = await serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
-    status: verification.status,
-    statusReason: verification.statusReason,
-    bankReference: verification.bankReference,
-    authCode: verification.authCode,
-    gatewayTransactionId: verification.gatewayTransactionId,
-    gatewayStatusCode: verification.status === "SUCCESS" ? "captured" : "failed",
-    paymentMode: verification.paymentMode || "NetBanking",
-    bankName: verification.bankName || "HDFC Bank",
-    verificationMethod: "HASH_VALIDATION"
-  });
-  const tokenParam = req.query.token || "";
-  let session = paymentSessionStore.getByOrderId(txn.orderId);
+  if (!txn && razorpay_order_id) {
+    txn = await serverTransactionStore.fetchByOrderId(razorpay_order_id);
+  }
+  if (!txn && razorpay_order_id) {
+    txn = serverTransactionStore.getAll().find(
+      (t) => t.gatewayTransactionId === razorpay_order_id || t.orderId === razorpay_order_id
+    );
+  }
+  let session = txn ? paymentSessionStore.getByOrderId(txn.orderId) : void 0;
   if (!session && tokenParam) {
     session = paymentSessionStore.getAnyByToken(tokenParam);
   }
-  if (!session && txn.applicationRef) {
+  if (!session && txn?.applicationRef) {
     session = paymentSessionStore.findActivePending(txn.applicationCode, txn.applicationRef) || paymentSessionStore.getAll().find(
-      (s) => s.sourceCode === txn.applicationCode && s.applicationReference === txn.applicationRef
+      (s) => s.sourceCode === txn?.applicationCode && s.applicationReference === txn?.applicationRef
     );
   }
-  if (session && verification.status === "SUCCESS") {
-    paymentSessionStore.markCompleted(session.sessionToken);
-  }
-  const targetReturnUrl = req.query.returnUrl || session?.returnUrl;
-  const renderRedirectHtml = (redirectUrl) => `<!DOCTYPE html>
+  const targetReturnUrl = rawTargetReturnUrl || session?.returnUrl || txn?.returnUrl || "https://research.aima.in/registration";
+  const renderRedirectHtml = (redirectUrl, title, subtitle, isSuccess) => `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta http-equiv="refresh" content="0;url=${redirectUrl}">
-  <title>Payment Completed - Redirecting...</title>
+  <title>${title} - Redirecting...</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f8fafc; color: #1e293b; text-align: center; }
     .card { background: white; padding: 2.5rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 420px; width: 90%; }
-    .spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: #002b49; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.25rem; }
+    .spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: ${isSuccess ? "#10b981" : "#ef4444"}; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.25rem; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    h2 { margin: 0 0 0.5rem; font-size: 1.25rem; color: #002b49; font-weight: 700; }
+    h2 { margin: 0 0 0.5rem; font-size: 1.25rem; color: ${isSuccess ? "#065f46" : "#991b1b"}; font-weight: 700; }
     p { margin: 0 0 1.5rem; color: #64748b; font-size: 0.875rem; line-height: 1.5; }
-    a { display: inline-block; padding: 0.75rem 1.5rem; background: #002b49; color: white; text-decoration: none; border-radius: 0.5rem; font-weight: 600; font-size: 0.875rem; }
+    a { display: inline-block; padding: 0.75rem 1.5rem; background: ${isSuccess ? "#002b49" : "#b91c1c"}; color: white; text-decoration: none; border-radius: 0.5rem; font-weight: 600; font-size: 0.875rem; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="spinner"></div>
-    <h2>Payment ${verification.status === "SUCCESS" ? "Successful" : "Completed"}</h2>
-    <p>Redirecting you back to your application...</p>
+    <h2>${title}</h2>
+    <p>${subtitle}</p>
     <a href="${redirectUrl}">Click here if not redirected automatically</a>
   </div>
   <script>
@@ -2903,27 +2932,79 @@ paymentRouter.post("/payments/hdfc-collectnow/callback", async (req, res) => {
   </script>
 </body>
 </html>`;
-  if (targetReturnUrl) {
-    let finalUrl = targetReturnUrl;
+  if (isFailure || !razorpay_signature) {
+    const failureReason = errorDescription || "Payment declined or cancelled by candidate";
+    console.warn(`[HDFC Collect Now Callback] Payment failure recorded for order ${razorpay_order_id || txn?.orderId || "unknown"}: ${failureReason}`);
+    if (txn) {
+      await serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
+        status: "FAILED",
+        statusReason: failureReason,
+        gatewayStatusCode: "failed",
+        gatewayTransactionId: razorpay_payment_id || txn.gatewayTransactionId || razorpay_order_id,
+        verificationMethod: "HASH_VALIDATION"
+      });
+    }
+    let finalUrl2 = targetReturnUrl;
     try {
       const returnUrlObj = new URL(targetReturnUrl);
-      returnUrlObj.searchParams.set("orderId", txn.orderId);
-      returnUrlObj.searchParams.set("transactionId", txn.id);
-      returnUrlObj.searchParams.set("status", verification.status);
-      returnUrlObj.searchParams.set("reference", txn.applicationRef);
-      returnUrlObj.searchParams.set("paymentId", razorpay_payment_id);
-      finalUrl = returnUrlObj.toString();
+      if (txn) {
+        returnUrlObj.searchParams.set("orderId", txn.orderId);
+        returnUrlObj.searchParams.set("transactionId", txn.id);
+        returnUrlObj.searchParams.set("reference", txn.applicationRef);
+      }
+      returnUrlObj.searchParams.set("status", "FAILED");
+      returnUrlObj.searchParams.set("reason", failureReason);
+      if (razorpay_payment_id) {
+        returnUrlObj.searchParams.set("paymentId", razorpay_payment_id);
+      }
+      finalUrl2 = returnUrlObj.toString();
     } catch {
       const sep = targetReturnUrl.includes("?") ? "&" : "?";
-      finalUrl = `${targetReturnUrl}${sep}orderId=${encodeURIComponent(txn.orderId)}&transactionId=${encodeURIComponent(txn.id)}&status=${verification.status}&reference=${encodeURIComponent(txn.applicationRef)}&paymentId=${encodeURIComponent(razorpay_payment_id)}`;
+      finalUrl2 = `${targetReturnUrl}${sep}status=FAILED&reason=${encodeURIComponent(failureReason)}${txn ? `&orderId=${encodeURIComponent(txn.orderId)}&reference=${encodeURIComponent(txn.applicationRef)}` : ""}`;
     }
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    return res.status(200).send(renderRedirectHtml(finalUrl));
+    return res.status(200).send(renderRedirectHtml(finalUrl2, "Payment Not Completed", "Redirecting you back to your application...", false));
   }
-  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
-  const finalAppUrl = `${appUrl}/?orderId=${encodeURIComponent(txn.orderId)}&status=${verification.status}`;
+  const verification = await hdfcCollectNowAdapter.verifyPayment({
+    orderId: razorpay_order_id,
+    paymentId: razorpay_payment_id,
+    signature: razorpay_signature
+  });
+  if (txn) {
+    await serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
+      status: verification.status,
+      statusReason: verification.statusReason,
+      bankReference: verification.bankReference,
+      authCode: verification.authCode,
+      gatewayTransactionId: verification.gatewayTransactionId,
+      gatewayStatusCode: verification.status === "SUCCESS" ? "captured" : "failed",
+      paymentMode: verification.paymentMode || "NetBanking",
+      bankName: verification.bankName || "HDFC Bank",
+      verificationMethod: "HASH_VALIDATION"
+    });
+  }
+  if (session && verification.status === "SUCCESS") {
+    paymentSessionStore.markCompleted(session.sessionToken);
+  } else if (tokenParam && verification.status === "SUCCESS") {
+    paymentSessionStore.markCompleted(tokenParam);
+  }
+  let finalUrl = targetReturnUrl;
+  try {
+    const returnUrlObj = new URL(targetReturnUrl);
+    if (txn) {
+      returnUrlObj.searchParams.set("orderId", txn.orderId);
+      returnUrlObj.searchParams.set("transactionId", txn.id);
+      returnUrlObj.searchParams.set("reference", txn.applicationRef);
+    }
+    returnUrlObj.searchParams.set("status", verification.status);
+    returnUrlObj.searchParams.set("paymentId", razorpay_payment_id);
+    finalUrl = returnUrlObj.toString();
+  } catch {
+    const sep = targetReturnUrl.includes("?") ? "&" : "?";
+    finalUrl = `${targetReturnUrl}${sep}status=${verification.status}&paymentId=${encodeURIComponent(razorpay_payment_id)}${txn ? `&orderId=${encodeURIComponent(txn.orderId)}&reference=${encodeURIComponent(txn.applicationRef)}` : ""}`;
+  }
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  return res.status(200).send(renderRedirectHtml(finalAppUrl));
+  return res.status(200).send(renderRedirectHtml(finalUrl, verification.status === "SUCCESS" ? "Payment Successful" : "Payment Completed", "Redirecting you back to your application...", verification.status === "SUCCESS"));
 });
 paymentRouter.post("/payments/ccavenue/initiate", (req, res) => {
   const { transactionId } = req.body;
