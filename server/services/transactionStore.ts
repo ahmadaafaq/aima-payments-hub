@@ -341,7 +341,7 @@ export class ServerTransactionStore {
     this.processedCallbacks.add(idempotencyKey);
   }
 
-  public updateVerifiedGatewayTransaction(
+  public async updateVerifiedGatewayTransaction(
     txnId: string,
     updates: {
       status: 'SUCCESS' | 'FAILED' | 'PENDING' | 'CANCELLED';
@@ -354,7 +354,7 @@ export class ServerTransactionStore {
       bankName?: string;
       verificationMethod?: 'HASH_VALIDATION' | 'DUAL_VERIFICATION_API' | 'SIMULATED' | 'AES_DECRYPTION';
     }
-  ): ServerTransaction {
+  ): Promise<ServerTransaction> {
     const existing = this.transactions.get(txnId);
     if (!existing) {
       throw new Error(`Transaction ${txnId} not found`);
@@ -442,8 +442,7 @@ export class ServerTransactionStore {
 
     this.transactions.set(txnId, updated);
     this.persistToDisk();
-    this.upsertToSupabase(updated);
-
+    await this.upsertToSupabase(updated);
     return updated;
   }
 

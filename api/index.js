@@ -2301,7 +2301,7 @@ var ServerTransactionStore = class {
   markCallbackProcessed(idempotencyKey) {
     this.processedCallbacks.add(idempotencyKey);
   }
-  updateVerifiedGatewayTransaction(txnId, updates) {
+  async updateVerifiedGatewayTransaction(txnId, updates) {
     const existing = this.transactions.get(txnId);
     if (!existing) {
       throw new Error(`Transaction ${txnId} not found`);
@@ -2383,7 +2383,7 @@ var ServerTransactionStore = class {
     }
     this.transactions.set(txnId, updated);
     this.persistToDisk();
-    this.upsertToSupabase(updated);
+    await this.upsertToSupabase(updated);
     return updated;
   }
   /**
@@ -2704,7 +2704,7 @@ paymentRouter.post("/payments/worldline/initiate", (req, res) => {
     });
   }
 });
-paymentRouter.post("/payments/worldline/callback", (req, res) => {
+paymentRouter.post("/payments/worldline/callback", async (req, res) => {
   const callbackData = req.body;
   const txnId = callbackData?.paymentMethod?.paymentTransaction?.merchantTransactionIdentifier || callbackData?.merchantTxnId || callbackData?.txnId || callbackData?.consumerData?.txnId;
   if (!txnId) {
@@ -2724,7 +2724,7 @@ paymentRouter.post("/payments/worldline/callback", (req, res) => {
     });
   }
   const verification = worldlineAdapter.verifyResponse(callbackData);
-  const updatedTxn = serverTransactionStore.updateVerifiedGatewayTransaction(txnId, {
+  const updatedTxn = await serverTransactionStore.updateVerifiedGatewayTransaction(txnId, {
     status: verification.status,
     statusReason: verification.statusReason,
     bankReference: verification.bankReference,
@@ -2792,7 +2792,7 @@ paymentRouter.post("/payments/hdfc-collectnow/verify", async (req, res) => {
     paymentId: razorpay_payment_id,
     signature: razorpay_signature
   });
-  const updatedTxn = serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
+  const updatedTxn = await serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
     status: verification.status,
     statusReason: verification.statusReason,
     bankReference: verification.bankReference,
@@ -2814,7 +2814,7 @@ paymentRouter.post("/payments/hdfc-collectnow/verify", async (req, res) => {
     transaction: updatedTxn
   });
 });
-paymentRouter.post("/payments/hdfc-collectnow/cancel", (req, res) => {
+paymentRouter.post("/payments/hdfc-collectnow/cancel", async (req, res) => {
   const { transactionId, reason } = req.body;
   if (!transactionId) {
     return res.status(400).json({ error: "transactionId is required" });
@@ -2823,7 +2823,7 @@ paymentRouter.post("/payments/hdfc-collectnow/cancel", (req, res) => {
   if (!txn) {
     return res.status(404).json({ error: "Transaction not found" });
   }
-  const updatedTxn = serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
+  const updatedTxn = await serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
     status: "CANCELLED",
     statusReason: reason || "Customer dismissed checkout modal before completing payment",
     verificationMethod: "HASH_VALIDATION"
@@ -2850,7 +2850,7 @@ paymentRouter.post("/payments/hdfc-collectnow/callback", async (req, res) => {
     paymentId: razorpay_payment_id,
     signature: razorpay_signature
   });
-  const updatedTxn = serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
+  const updatedTxn = await serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
     status: verification.status,
     statusReason: verification.statusReason,
     bankReference: verification.bankReference,
@@ -2875,7 +2875,36 @@ paymentRouter.post("/payments/hdfc-collectnow/callback", async (req, res) => {
     paymentSessionStore.markCompleted(session.sessionToken);
   }
   const targetReturnUrl = req.query.returnUrl || session?.returnUrl;
+  const renderRedirectHtml = (redirectUrl) => `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="0;url=${redirectUrl}">
+  <title>Payment Completed - Redirecting...</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f8fafc; color: #1e293b; text-align: center; }
+    .card { background: white; padding: 2.5rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 420px; width: 90%; }
+    .spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: #002b49; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.25rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h2 { margin: 0 0 0.5rem; font-size: 1.25rem; color: #002b49; font-weight: 700; }
+    p { margin: 0 0 1.5rem; color: #64748b; font-size: 0.875rem; line-height: 1.5; }
+    a { display: inline-block; padding: 0.75rem 1.5rem; background: #002b49; color: white; text-decoration: none; border-radius: 0.5rem; font-weight: 600; font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <h2>Payment ${verification.status === "SUCCESS" ? "Successful" : "Completed"}</h2>
+    <p>Redirecting you back to your application...</p>
+    <a href="${redirectUrl}">Click here if not redirected automatically</a>
+  </div>
+  <script>
+    window.location.replace(${JSON.stringify(redirectUrl)});
+  </script>
+</body>
+</html>`;
   if (targetReturnUrl) {
+    let finalUrl = targetReturnUrl;
     try {
       const returnUrlObj = new URL(targetReturnUrl);
       returnUrlObj.searchParams.set("orderId", txn.orderId);
@@ -2883,16 +2912,18 @@ paymentRouter.post("/payments/hdfc-collectnow/callback", async (req, res) => {
       returnUrlObj.searchParams.set("status", verification.status);
       returnUrlObj.searchParams.set("reference", txn.applicationRef);
       returnUrlObj.searchParams.set("paymentId", razorpay_payment_id);
-      return res.redirect(returnUrlObj.toString());
+      finalUrl = returnUrlObj.toString();
     } catch {
       const sep = targetReturnUrl.includes("?") ? "&" : "?";
-      return res.redirect(
-        `${targetReturnUrl}${sep}orderId=${encodeURIComponent(txn.orderId)}&transactionId=${encodeURIComponent(txn.id)}&status=${verification.status}&reference=${encodeURIComponent(txn.applicationRef)}&paymentId=${encodeURIComponent(razorpay_payment_id)}`
-      );
+      finalUrl = `${targetReturnUrl}${sep}orderId=${encodeURIComponent(txn.orderId)}&transactionId=${encodeURIComponent(txn.id)}&status=${verification.status}&reference=${encodeURIComponent(txn.applicationRef)}&paymentId=${encodeURIComponent(razorpay_payment_id)}`;
     }
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.status(200).send(renderRedirectHtml(finalUrl));
   }
   const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
-  return res.redirect(`${appUrl}/?orderId=${encodeURIComponent(txn.orderId)}&status=${verification.status}`);
+  const finalAppUrl = `${appUrl}/?orderId=${encodeURIComponent(txn.orderId)}&status=${verification.status}`;
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  return res.status(200).send(renderRedirectHtml(finalAppUrl));
 });
 paymentRouter.post("/payments/ccavenue/initiate", (req, res) => {
   const { transactionId } = req.body;
@@ -2922,7 +2953,7 @@ paymentRouter.post("/payments/ccavenue/initiate", (req, res) => {
     });
   }
 });
-paymentRouter.post("/payments/ccavenue/callback", (req, res) => {
+paymentRouter.post("/payments/ccavenue/callback", async (req, res) => {
   const { encResp, orderNo } = req.body;
   if (!encResp) {
     return res.status(400).json({ error: "encResp is required" });
@@ -2944,7 +2975,7 @@ paymentRouter.post("/payments/ccavenue/callback", (req, res) => {
       transaction: txn
     });
   }
-  const updatedTxn = serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
+  const updatedTxn = await serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
     status: verification.status,
     statusReason: verification.statusReason,
     bankReference: verification.bankReference,

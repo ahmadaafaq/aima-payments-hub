@@ -776,6 +776,8 @@
     "idempotencyKey": "PAY-1792590555614-lc8srl",
     "callbackDelivered": false,
     "callbackResponse": null,
+    "sessionToken": "12d8de5235ce66e8860a1dbf76d9d6054afe02ad76b3334f36d2a3c79ab7b7ac",
+    "returnUrl": "https://research.aima.in/registration",
     "auditTrail": [
       {
         "step": "Common Pay Order Initiated",
@@ -864,5 +866,120 @@
     "sessionToken": "test-token-12345",
     "returnUrl": "https://research.aima.in/registration",
     "auditTrail": []
+  },
+  {
+    "id": "TXN-20261021-55480",
+    "orderId": "ORD-AIMA-CASELEAGUE-5615",
+    "applicationId": "src-case-league-001",
+    "applicationCode": "CASE_LEAGUE",
+    "applicationName": "AIMA Case League & Olympiad",
+    "applicationRef": "AIMA-CL26-25187",
+    "applicantName": "Test Registration",
+    "applicantEmail": "admin@aima.in",
+    "applicantPhone": "8989898989",
+    "courseOrEvent": "REGISTRATION_FEE",
+    "feeDescription": "REGISTRATION_FEE",
+    "baseAmount": 200,
+    "gstAmount": 0,
+    "totalAmount": 200,
+    "gatewayAmount": 200,
+    "currency": "INR",
+    "gateway": "CCAVENUE",
+    "gatewayEnvironment": "sandbox",
+    "isSimulated": false,
+    "status": "PENDING",
+    "statusReason": null,
+    "bankReference": null,
+    "authCode": null,
+    "paymentMode": null,
+    "bankName": null,
+    "gatewayTransactionId": null,
+    "gatewayStatusCode": null,
+    "createdAt": "2026-10-21T14:11:20.967+00:00",
+    "completedAt": null,
+    "verifiedAt": null,
+    "verificationMethod": "HASH_VALIDATION",
+    "idempotencyKey": "PAY-1792591880967-mre22",
+    "callbackDelivered": false,
+    "callbackResponse": null,
+    "sessionToken": "bbf3862b704fc4d2f25605eb59abe3d2448ae6f91723bb0c13fd820be4bddf66",
+    "returnUrl": "https://research.aima.in/registration",
+    "externalOrderId": "AIMA-CL26-25187",
+    "paymentPurpose": "REGISTRATION_FEE",
+    "auditTrail": [
+      {
+        "step": "Common Pay Order Initiated",
+        "detail": "Initiated via /pay URL. Source: CASE_LEAGUE (Events). Auto-resolved Gateway: CCAVENUE (Mode: AUTO). Ref: AIMA-CL26-25187",
+        "status": "ok",
+        "timestamp": "2026-10-21T14:11:20.967Z"
+      }
+    ]
+  },
+  {
+    "id": "TXN-20261021-21023",
+    "orderId": "ORD-AIMA-CASE_LEAGUE-2919",
+    "applicationId": "case-league",
+    "applicationCode": "CASE_LEAGUE",
+    "applicationName": "AIMA Case League & Olympiad",
+    "applicationRef": "AIMA-CL26-25187",
+    "applicantName": "Test Registration",
+    "applicantEmail": "admin@aima.in",
+    "applicantPhone": "",
+    "courseOrEvent": "REGISTRATION_FEE",
+    "feeDescription": "REGISTRATION_FEE",
+    "baseAmount": 200,
+    "gstAmount": 0,
+    "totalAmount": 200,
+    "gatewayAmount": 200,
+    "currency": "INR",
+    "gateway": "CCAVENUE",
+    "gatewayEnvironment": "sandbox",
+    "isSimulated": false,
+    "status": "SUCCESS",
+    "statusReason": "Transaction captured and verified successfully via HDFC Collect Now",
+    "bankReference": "6477188",
+    "authCode": "pay_TqaRoA5PmEtDHp",
+    "paymentMode": "NETBANKING",
+    "bankName": "BARB_R",
+    "gatewayTransactionId": "pay_TqaRoA5PmEtDHp",
+    "gatewayStatusCode": "captured",
+    "createdAt": "2026-10-21T14:11:31.836+00:00",
+    "completedAt": "2026-10-21T14:12:48.636+00:00",
+    "verifiedAt": "2026-10-21T14:12:48.636+00:00",
+    "verificationMethod": "HASH_VALIDATION",
+    "idempotencyKey": "IDEM-TXN-20261021-21023",
+    "callbackDelivered": false,
+    "callbackResponse": {
+      "targetUrl": "https://caseleague.aima.in/api/v1/payment-notification",
+      "httpStatus": 0,
+      "deliveredAt": "2026-10-21T14:12:48.636Z",
+      "payloadSnippet": "{\"eventId\":\"EVT-1792591968637-F4A4FBF8186B\",\"orderId\":\"ORD-AIMA-CASE_LEAGUE-2919\",\"status\":\"SUCCESS\",\"gateway\":\"CCAVENUE\",\"amountPaise\":20000,\"signedAt\":\"2026-10-21T14:12:48.637Z\"}"
+    },
+    "auditTrail": [
+      {
+        "step": "Order Created",
+        "detail": "Server order ORD-AIMA-CASE_LEAGUE-2919 created for CASE_LEAGUE (AIMA-CL26-25187). Nominal: ₹200, Gateway: CCAVENUE (Test Charge: ₹200.00)",
+        "status": "ok",
+        "timestamp": "2026-10-21T14:11:31.836Z"
+      },
+      {
+        "step": "HDFC Collect Now Order Created",
+        "detail": "Created Razorpay order order_TqaQkJ5oU3f0Hi for MID ToYqDbYJUM2LIS. Amount: ₹200.00 (in paise: 20000)",
+        "status": "ok",
+        "timestamp": "2026-10-21T14:11:32.827Z"
+      },
+      {
+        "step": "Gateway Verification (SUCCESS)",
+        "detail": "Verified via HASH_VALIDATION. Bank Ref: 6477188. Reason: Transaction captured and verified successfully via HDFC Collect Now",
+        "status": "ok",
+        "timestamp": "2026-10-21T14:12:48.636Z"
+      },
+      {
+        "step": "S2S Notification Queued",
+        "detail": "Signed notification EVT-1792591968637-F4A4FBF8186B queued for delivery to https://caseleague.aima.in/api/v1/payment-notification",
+        "status": "ok",
+        "timestamp": "2026-10-21T14:12:48.636Z"
+      }
+    ]
   }
 ]
