@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { TransactionRecord, PaymentGateway, PaymentStatus } from '../types/payment';
 import { formatINR } from '../services/paymentStorage';
 import { 
@@ -15,7 +15,11 @@ import {
   Building,
   CreditCard,
   Layers,
+  ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Calendar,
   ExternalLink,
   ShieldCheck,
   FileSpreadsheet,
@@ -42,6 +46,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedApp, setSelectedApp] = useState<string>('ALL');
   const [detailModalTransaction, setDetailModalTransaction] = useState<TransactionRecord | null>(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  // Date and Time formatters (IST Asia/Kolkata)
+  const formatDate = (isoString?: string) => {
+    if (!isoString) return '—';
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return isoString;
+      return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Asia/Kolkata',
+      });
+    } catch {
+      return isoString;
+    }
+  };
+
+  const formatTime = (isoString?: string) => {
+    if (!isoString) return '';
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Kolkata',
+      });
+    } catch {
+      return '';
+    }
+  };
 
   // Reconciliation State
   const [showReconcilePanel, setShowReconcilePanel] = useState<boolean>(false);
@@ -171,6 +213,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return matchesSearch && matchesGateway && matchesStatus && matchesApp;
     });
   }, [transactions, searchTerm, selectedGateway, selectedStatus, selectedApp]);
+
+  // Reset page when filters or pageSize change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedGateway, selectedStatus, selectedApp, pageSize]);
+
+  // Sort by createdAt descending (latest transactions at the top)
+  const sortedTransactions = useMemo(() => {
+    return [...filteredTransactions].sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [filteredTransactions]);
+
+  const totalItems = sortedTransactions.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedTransactions = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return sortedTransactions.slice(start, start + pageSize);
+  }, [sortedTransactions, safeCurrentPage, pageSize]);
 
   // CSV Export handler
   const handleExportCSV = () => {
@@ -467,8 +532,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* Filter count notice */}
         <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
           <span>
-            Showing <strong className="text-slate-900">{filteredTransactions.length}</strong> of{' '}
-            {transactions.length} transactions
+            Showing <strong className="text-slate-900 font-mono">{totalItems > 0 ? `${Math.min((safeCurrentPage - 1) * pageSize + 1, totalItems)}–${Math.min(safeCurrentPage * pageSize, totalItems)}` : 0}</strong> of{' '}
+            <strong className="text-slate-900 font-mono">{totalItems}</strong> filtered ({transactions.length} total) transactions · Page <strong className="text-slate-900">{safeCurrentPage}</strong> of {totalPages}
           </span>
           {(searchTerm || selectedGateway !== 'ALL' || selectedStatus !== 'ALL' || selectedApp !== 'ALL') && (
             <button
@@ -493,6 +558,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-3 px-4">Order & Txn ID</th>
+                <th className="py-3 px-4">Date & Time</th>
                 <th className="py-3 px-4">Application</th>
                 <th className="py-3 px-4">Applicant Particulars</th>
                 <th className="py-3 px-4">Gateway / Mode</th>
@@ -502,8 +568,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredTransactions.length > 0 ? (
-                filteredTransactions.map((txn) => {
+              {paginatedTransactions.length > 0 ? (
+                paginatedTransactions.map((txn) => {
                   const isSuccess = txn.status === 'SUCCESS';
                   const isFailed = txn.status === 'FAILED';
                   const isPending = txn.status === 'PENDING';
@@ -515,6 +581,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <td className="py-3 px-4">
                         <div className="font-mono font-bold text-slate-900">{txn.orderId}</div>
                         <div className="font-mono text-[11px] text-slate-500">{txn.id}</div>
+                      </td>
+
+                      {/* Date & Time */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{formatDate(txn.createdAt)}</span>
+                        </div>
+                        <div className="text-[11px] font-mono text-slate-500 pl-5">
+                          {formatTime(txn.createdAt)}
+                        </div>
                       </td>
 
                       {/* Application */}
@@ -604,7 +681,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
                     No transactions match the selected filters.
                   </td>
                 </tr>
@@ -612,6 +689,109 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Bar */}
+        {totalItems > 0 && (
+          <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+            <div className="flex items-center gap-2">
+              <span>
+                Showing <strong className="text-slate-900 font-mono">{Math.min((safeCurrentPage - 1) * pageSize + 1, totalItems)}</strong> to{' '}
+                <strong className="text-slate-900 font-mono">{Math.min(safeCurrentPage * pageSize, totalItems)}</strong> of{' '}
+                <strong className="text-slate-900 font-mono">{totalItems}</strong> transactions
+              </span>
+              <div className="hidden sm:flex items-center gap-1.5 ml-4 pl-4 border-l border-slate-200">
+                <span className="text-slate-500">Rows per page:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="py-1 px-2 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#002b49]"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Navigation buttons */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCurrentPage(1)}
+                disabled={safeCurrentPage === 1}
+                title="First Page"
+                className="p-1.5 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              >
+                <ChevronsLeft className="w-4 h-4 text-slate-700" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safeCurrentPage === 1}
+                title="Previous Page"
+                className="p-1.5 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4 text-slate-700" />
+              </button>
+
+              {/* Page Numbers */}
+              <div className="flex items-center gap-1 px-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((page) => {
+                    return (
+                      page === 1 ||
+                      page === totalPages ||
+                      Math.abs(page - safeCurrentPage) <= 1
+                    );
+                  })
+                  .map((page, idx, arr) => {
+                    const prev = arr[idx - 1];
+                    const showEllipsis = prev && page - prev > 1;
+
+                    return (
+                      <React.Fragment key={page}>
+                        {showEllipsis && <span className="px-1 text-slate-400 font-bold">...</span>}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(page)}
+                          className={`min-w-[28px] h-7 px-2 rounded font-bold text-xs transition-colors cursor-pointer ${
+                            safeCurrentPage === page
+                              ? 'bg-[#002b49] text-white shadow-xs'
+                              : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safeCurrentPage === totalPages}
+                title="Next Page"
+                className="p-1.5 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              >
+                <ChevronRight className="w-4 h-4 text-slate-700" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={safeCurrentPage === totalPages}
+                title="Last Page"
+                className="p-1.5 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              >
+                <ChevronsRight className="w-4 h-4 text-slate-700" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Transaction Detail & Audit Trail Modal */}
@@ -643,10 +823,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Modal Body */}
             <div className="p-6 space-y-5 text-xs">
               {/* Top metadata grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <div>
                   <span className="text-[11px] text-slate-500 block">Transaction ID</span>
                   <span className="font-mono font-bold text-slate-900">{detailModalTransaction.id}</span>
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-500 block">Date & Time</span>
+                  <span className="font-semibold text-slate-900 block">{formatDate(detailModalTransaction.createdAt)}</span>
+                  <span className="font-mono text-[10px] text-slate-500">{formatTime(detailModalTransaction.createdAt)}</span>
                 </div>
                 <div>
                   <span className="text-[11px] text-slate-500 block">Total Amount</span>
