@@ -16,7 +16,7 @@
     "department": "CME",
     "description": "AIMA Centre for Management Research and Case Repository portal (Case League & Research)",
     "isActive": true,
-    "assignedGateway": "CCAVENUE",
+    "assignedGateway": "WORLDLINE_PAYNIMO",
     "routingMode": "AUTO",
     "allowedReturnUrls": [
       "https://amiacrc.aima.in",
@@ -97,18 +97,18 @@
       {
         "action": "GATEWAY_ASSIGNMENT_UPDATED",
         "detail": "Assigned gateway updated from CCAVENUE to WORLDLINE_PAYNIMO (Mode: AUTO, Dept: CME)",
-        "timestamp": "2026-10-21T11:46:35.118Z",
+        "timestamp": "2026-10-21T12:14:57.127Z",
         "performedBy": "ADMIN_TEST"
       },
       {
         "action": "GATEWAY_ASSIGNMENT_UPDATED",
         "detail": "Assigned gateway updated from WORLDLINE_PAYNIMO to CCAVENUE (Mode: AUTO, Dept: CME)",
-        "timestamp": "2026-10-21T11:46:35.118Z",
+        "timestamp": "2026-10-21T12:14:57.127Z",
         "performedBy": "ADMIN_TEST"
       }
     ],
     "createdAt": "2026-10-01T00:00:00+00:00",
-    "updatedAt": "2026-10-21T11:46:35.118+00:00"
+    "updatedAt": "2026-10-21T12:14:57.127+00:00"
   },
   {
     "id": "src-cme-adm-001",
@@ -862,7 +862,7 @@
     "updatedAt": "2026-10-01T00:00:00+00:00"
   },
   {
-    "id": "src-newaimaportal-1792583195119",
+    "id": "src-newaimaportal-1792584897128",
     "sourceCode": "NEW_AIMA_PORTAL",
     "aliases": [],
     "name": "New AIMA Executive Portal",
@@ -884,10 +884,10 @@
     "amountRules": [],
     "credentials": [
       {
-        "keyHash": "60e07c49ba4910b9d9e83a3d39193ce39eb58d5827ce438790f1120b4c10fe70",
+        "keyHash": "23b70298c40dc66572e328dc03c82234ca1ed7b271f4ab27bcb327e200611c14",
         "isActive": true,
-        "createdAt": "2026-10-21T11:46:35.119Z",
-        "keyPrefix": "aima_9c4",
+        "createdAt": "2026-10-21T12:14:57.128Z",
+        "keyPrefix": "aima_e00",
         "sourceCode": "NEW_AIMA_PORTAL",
         "credentialId": "CRED-NEWAIMAPORTAL-01"
       }
@@ -896,12 +896,12 @@
       {
         "action": "REGISTERED",
         "detail": "Application registered with assigned gateway: WORLDLINE_PAYNIMO",
-        "timestamp": "2026-10-21T11:46:35.119Z",
+        "timestamp": "2026-10-21T12:14:57.128Z",
         "performedBy": "ADMIN"
       }
     ],
-    "createdAt": "2026-10-21T11:46:35.119+00:00",
-    "updatedAt": "2026-10-21T11:46:35.119+00:00"
+    "createdAt": "2026-10-21T12:14:57.128+00:00",
+    "updatedAt": "2026-10-21T12:14:57.128+00:00"
   },
   {
     "id": "src-testapp-1792574925277",

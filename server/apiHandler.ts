@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express, { Request, Response } from 'express';
-import { paymentRouter } from '../server/routes/paymentRoutes';
-import { v1Router, handleCommonPay } from '../server/routes/v1Routes';
+import { paymentRouter } from './routes/paymentRoutes';
+import { v1Router, handleCommonPay } from './routes/v1Routes';
 
 const app = express();
 

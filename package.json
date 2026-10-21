@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch server.ts",
-    "build": "vite build",
+    "build": "vite build && esbuild server/apiHandler.ts --bundle --platform=node --format=esm --packages=external --outfile=api/index.js",
     "start": "tsx server.ts",
     "test": "tsx tests/paymentGateways.test.ts",
     "test:phase3": "tsx tests/phase3Security.test.ts",

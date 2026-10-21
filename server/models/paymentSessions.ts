@@ -197,12 +197,6 @@ export class PaymentSessionStore {
     this.sessions.set(token, session);
     return session;
   }
-
-  public getAll(): PaymentSession[] {
-    return Array.from(this.sessions.values()).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  }
 }
 
 export const paymentSessionStore = new PaymentSessionStore();
