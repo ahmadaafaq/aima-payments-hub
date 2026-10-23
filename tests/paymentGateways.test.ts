@@ -9,9 +9,12 @@ console.log('🧪 Starting AIMA Payment Hub Automated Gateway Tests...\n');
 let testsPassed = 0;
 let testsFailed = 0;
 
-function runTest(name: string, fn: () => void) {
+async function runTest(name: string, fn: () => any) {
   try {
-    fn();
+    const res = fn();
+    if (res && typeof res.then === 'function') {
+      await res;
+    }
     console.log(`  ✅ PASS: ${name}`);
     testsPassed++;
   } catch (err: any) {
@@ -20,6 +23,8 @@ function runTest(name: string, fn: () => void) {
     testsFailed++;
   }
 }
+
+async function runAll() {
 
 // -----------------------------------------------------------------------------
 // TEST SUITE 1: Worldline / Paynimo Adapter
@@ -233,8 +238,8 @@ runTest('Should save and retrieve transaction by ID and Order ID', () => {
 });
 
 // 11. Genuine gateway verification and source notification delivery
-runTest('Should verify gateway transaction and generate originating webhook payload', () => {
-  const verified = store.updateVerifiedGatewayTransaction('TXN-SANDBOX-001', {
+runTest('Should verify gateway transaction and generate originating webhook payload', async () => {
+  const verified = await store.updateVerifiedGatewayTransaction('TXN-SANDBOX-001', {
     status: 'SUCCESS',
     bankReference: 'WL-BANK-882201',
     authCode: 'AUTH-WL-9912',
@@ -275,12 +280,15 @@ runTest('Should strictly prevent simulator from overriding genuine gateway recor
 // -----------------------------------------------------------------------------
 // Test Summary
 // -----------------------------------------------------------------------------
-console.log('\n======================================================');
-console.log(`🎯 Test Run Complete: ${testsPassed} passed, ${testsFailed} failed.`);
-console.log('======================================================\n');
+  console.log('\n======================================================');
+  console.log(`🎯 Test Run Complete: ${testsPassed} passed, ${testsFailed} failed.`);
+  console.log('======================================================\n');
 
-if (testsFailed > 0) {
-  process.exit(1);
-} else {
-  process.exit(0);
+  if (testsFailed > 0) {
+    process.exit(1);
+  } else {
+    process.exit(0);
+  }
 }
+
+runAll();

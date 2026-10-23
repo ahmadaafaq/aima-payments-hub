@@ -144,6 +144,7 @@ export class HDFCCollectNowAdapter {
     orderId: string;
     paymentId: string;
     signature: string;
+    expectedAmountPaise?: number;
   }): Promise<{
     isValid: boolean;
     status: 'SUCCESS' | 'FAILED';
@@ -156,7 +157,7 @@ export class HDFCCollectNowAdapter {
     computedHashMatch: boolean;
     rawPayment?: any;
   }> {
-    const { orderId, paymentId, signature } = params;
+    const { orderId, paymentId, signature, expectedAmountPaise } = params;
     const keySecret = this.getKeySecret();
 
     if (!keySecret) {
@@ -196,9 +197,6 @@ export class HDFCCollectNowAdapter {
       console.warn('Could not fetch payment details from Razorpay API:', e);
     }
 
-    const isCapturedOrAuthorized =
-      paymentDetails?.status === 'captured' || paymentDetails?.status === 'authorized' || !paymentDetails;
-
     const bankRef =
       paymentDetails?.acquirer_data?.rrn ||
       paymentDetails?.acquirer_data?.bank_transaction_id ||
@@ -209,6 +207,24 @@ export class HDFCCollectNowAdapter {
       paymentDetails?.bank ||
       paymentDetails?.acquirer_data?.bank ||
       (paymentDetails?.method === 'upi' ? 'UPI / VPA' : 'HDFC Bank');
+
+    // Strict amount verification against gateway captured amount (Defense-in-depth against amount tampering)
+    if (expectedAmountPaise && paymentDetails && typeof paymentDetails.amount === 'number') {
+      if (paymentDetails.amount !== expectedAmountPaise) {
+        console.warn(`[SECURITY ALERT] Gateway Amount Mismatch! Expected: ₹${expectedAmountPaise / 100}, Gateway Received: ₹${paymentDetails.amount / 100}`);
+        return {
+          isValid: false,
+          status: 'FAILED',
+          statusReason: `AMOUNT_MISMATCH: Gateway captured amount ₹${(paymentDetails.amount / 100).toFixed(2)} does not match authoritative order amount ₹${(expectedAmountPaise / 100).toFixed(2)}. Possible parameter tampering.`,
+          bankReference: bankRef,
+          computedHashMatch: true,
+          rawPayment: paymentDetails,
+        };
+      }
+    }
+
+    const isCapturedOrAuthorized =
+      paymentDetails?.status === 'captured' || paymentDetails?.status === 'authorized' || !paymentDetails;
 
     return {
       isValid: true,

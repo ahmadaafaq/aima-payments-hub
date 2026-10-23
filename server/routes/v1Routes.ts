@@ -19,6 +19,7 @@ import { GatewayType, ServerTransaction } from '../gateways/gatewayTypes';
 import { WorldlinePaynimoAdapter } from '../gateways/worldlinePaynimo';
 import { CCAvenueAdapter } from '../gateways/ccavenue';
 import { HDFCCollectNowAdapter } from '../gateways/hdfcCollectNow';
+import { supabaseAdmin } from '../lib/supabaseClient';
 
 export const v1Router = Router();
 
@@ -156,7 +157,42 @@ export async function handleCommonPay(req: Request, res: Response): Promise<any>
     return isJson ? res.status(403).json(err) : res.status(403).send(renderErrorHtml('Unregistered Return URL', err.message));
   }
 
-  // 3. Validate amount
+  // 2b. Validate Cryptographic Message Integrity (HMAC-SHA256 signature)
+  const signatureParam = ((req.query.signature || req.query.sig || req.query.hmac || '') as string).trim();
+  const timestampParam = ((req.query.timestamp || req.query.ts || '') as string).trim();
+
+  if (signatureParam) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const reqSec = parseInt(timestampParam, 10);
+    if (isNaN(reqSec) || Math.abs(nowSec - reqSec) > 1800) {
+      const err = { error: 'EXPIRED_PAYMENT_URL', message: 'Payment URL timestamp has expired or is outside ±30 min tolerance. Please re-initiate payment from the portal.' };
+      return isJson ? res.status(403).json(err) : res.status(403).send(renderErrorHtml('Expired Payment Signature', err.message));
+    }
+
+    const appSecret = sourceApplicationRegistry.getAppSecret(sourceApp.sourceCode);
+    if (appSecret) {
+      const canonical = `${sourceApp.sourceCode}:${reference}:${amountStr}:${currency}:${timestampParam}`;
+      const expectedSig = crypto.createHmac('sha256', appSecret).update(canonical, 'utf8').digest('hex');
+
+      let isValidSig = false;
+      try {
+        isValidSig = crypto.timingSafeEqual(Buffer.from(signatureParam, 'utf8'), Buffer.from(expectedSig, 'utf8'));
+      } catch {
+        isValidSig = false;
+      }
+
+      if (!isValidSig) {
+        console.warn(`[SECURITY ALERT] Parameter tampering detected on /pay initiation! Source: ${sourceApp.sourceCode}, Ref: ${reference}, Tampered Amount: ${amountStr}`);
+        const err = {
+          error: 'PARAMETER_TAMPERING_DETECTED',
+          message: 'Security Violation: Cryptographic signature mismatch. The request amount or parameters have been modified in transit.',
+        };
+        return isJson ? res.status(403).json(err) : res.status(403).send(renderErrorHtml('Security Violation: Parameter Tampering Detected', err.message));
+      }
+    }
+  }
+
+  // 3. Validate amount format and currency
   const amountNum = parseFloat(amountStr);
   if (isNaN(amountNum) || amountNum <= 0) {
     const err = { error: 'INVALID_AMOUNT', message: `Amount must be a positive number. Received: '${amountStr}'` };
@@ -169,6 +205,37 @@ export async function handleCommonPay(req: Request, res: Response): Promise<any>
   }
 
   const amountPaise = Math.round(amountNum * 100);
+
+  // 3b. Server-Side Authoritative Database Verification (Cross-validates against backend registrations ledger)
+  if (reference && (sourceApp.sourceCode === 'CASE_LEAGUE' || sourceApp.sourceCode === 'AMIACRC')) {
+    try {
+      const { data: reg, error: regErr } = await supabaseAdmin
+        .from('registrations')
+        .select('registration_number, participant_count, fee_tier, subtotal_amount, total_amount')
+        .eq('registration_number', reference)
+        .maybeSingle();
+
+      if (reg && !regErr) {
+        const participantCount = reg.participant_count || 1;
+        // Authoritative server-side price calculation: strictly ₹200 per participant
+        const authoritativeAmount = participantCount * 200;
+        const authoritativePaise = authoritativeAmount * 100;
+
+        if (amountPaise !== authoritativePaise) {
+          console.warn(`[SECURITY ALERT] Request amount tampering detected! Ref: ${reference}, Submitted: ₹${amountNum}, Authoritative Server Price: ₹${authoritativeAmount} (${participantCount} participants)`);
+          const err = {
+            error: 'AMOUNT_TAMPERING_DETECTED',
+            message: `Security Violation: Client submitted amount ₹${amountNum.toFixed(2)} does not match server-calculated authoritative amount ₹${authoritativeAmount.toFixed(2)} for ${participantCount} participant(s) under registration ${reference}.`,
+          };
+          return isJson ? res.status(403).json(err) : res.status(403).send(renderErrorHtml('Security Violation: Amount Tampering Detected', err.message));
+        }
+      }
+    } catch (dbErr) {
+      console.warn('Database authoritative check skipped (offline or network notice):', dbErr);
+    }
+  }
+
+  // 3c. Registry Fee Rules Validation (Enforces TIERED_MULTIPLIER and unit pricing)
   const amountValidation = sourceApplicationRegistry.validateAmount(sourceApp, paymentPurpose, amountPaise);
   if (!amountValidation.valid) {
     const err = { error: 'AMOUNT_VALIDATION_FAILED', message: amountValidation.reason || 'Amount validation failed' };

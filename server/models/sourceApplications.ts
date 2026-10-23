@@ -31,7 +31,7 @@ const __dirname = path.dirname(__filename);
 const DATA_DIR = path.resolve(__dirname, '../data');
 const APPS_FILE_PATH = path.join(DATA_DIR, 'source_applications.json');
 
-export type AmountValidationMode = 'FIXED' | 'VARIABLE' | 'RANGE';
+export type AmountValidationMode = 'FIXED' | 'VARIABLE' | 'RANGE' | 'TIERED_MULTIPLIER';
 export type GatewayRoutingMode = 'AUTO' | 'USER_SELECTABLE';
 
 export interface AmountRule {
@@ -39,8 +39,10 @@ export interface AmountRule {
   description: string;
   mode: AmountValidationMode;
   fixedAmountPaise?: number;      // For FIXED mode — exact expected amount
-  minAmountPaise?: number;        // For VARIABLE/RANGE
-  maxAmountPaise?: number;        // For VARIABLE/RANGE
+  minAmountPaise?: number;        // For VARIABLE/RANGE/TIERED
+  maxAmountPaise?: number;        // For VARIABLE/RANGE/TIERED
+  unitPricePaise?: number;        // For TIERED_MULTIPLIER (e.g. 20000 = ₹200/participant)
+  allowedAmountsPaise?: number[]; // Explicit white-list of valid fee tiers in paise
   currency: 'INR';
   gstApplicable: boolean;
 }
@@ -273,10 +275,12 @@ export class SourceApplicationRegistry {
           amountRules: [
             {
               paymentPurpose: 'REGISTRATION_FEE',
-              description: 'Case League & Research Registration Fee',
-              mode: 'VARIABLE',
-              minAmountPaise: 1000,     // ₹10
-              maxAmountPaise: 10000000, // ₹1,00,000
+              description: 'Case League & Research Registration Fee (₹200 per participant)',
+              mode: 'TIERED_MULTIPLIER',
+              unitPricePaise: 20000,     // ₹200.00
+              minAmountPaise: 20000,     // Minimum ₹200.00 (1 participant)
+              maxAmountPaise: 2000000,   // ₹20,000.00 (100 participants)
+              allowedAmountsPaise: [20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000],
               currency: 'INR',
               gstApplicable: true,
             },
@@ -669,10 +673,20 @@ export class SourceApplicationRegistry {
           amountRules: [
             {
               paymentPurpose: 'REGISTRATION_FEE',
-              description: 'Case League Team Registration Fee',
-              mode: 'VARIABLE',
-              minAmountPaise: 1000,     // ₹10
-              maxAmountPaise: 10000000, // ₹1,00,000
+              description: 'Case League Team Registration Fee (₹200 per participant)',
+              mode: 'TIERED_MULTIPLIER',
+              unitPricePaise: 20000,     // ₹200.00 per participant
+              minAmountPaise: 20000,     // Minimum ₹200.00 (1 participant)
+              maxAmountPaise: 2000000,   // ₹20,000.00 (100 participants)
+              allowedAmountsPaise: [20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000],
+              currency: 'INR',
+              gstApplicable: true,
+            },
+            {
+              paymentPurpose: 'BOOTCAMP_FEE',
+              description: 'Case League Pre-competition Masterclass Fee',
+              mode: 'FIXED',
+              fixedAmountPaise: 50000,    // ₹500.00
               currency: 'INR',
               gstApplicable: true,
             },
@@ -1100,6 +1114,33 @@ export class SourceApplicationRegistry {
           reason: `Amount mismatch: expected ₹${(rule.fixedAmountPaise! / 100).toFixed(2)}, got ₹${(amountPaise / 100).toFixed(2)}`,
         };
       }
+    } else if (rule.mode === 'TIERED_MULTIPLIER') {
+      const min = rule.minAmountPaise ?? (rule.unitPricePaise ?? 0);
+      const max = rule.maxAmountPaise ?? Number.MAX_SAFE_INTEGER;
+      const unit = rule.unitPricePaise ?? 20000;
+
+      if (amountPaise < min || amountPaise > max) {
+        return {
+          valid: false,
+          reason: `Amount ₹${(amountPaise / 100).toFixed(2)} is outside permitted range [₹${(min / 100).toFixed(2)} – ₹${(max / 100).toFixed(2)}] for ${paymentPurpose}`,
+        };
+      }
+
+      if (amountPaise % unit !== 0) {
+        return {
+          valid: false,
+          reason: `Parameter tampering detected: Amount ₹${(amountPaise / 100).toFixed(2)} is invalid. Fee must strictly match authoritative unit price ₹${(unit / 100).toFixed(2)} per participant (e.g. ₹200, ₹400, ₹600...).`,
+        };
+      }
+
+      if (rule.allowedAmountsPaise && rule.allowedAmountsPaise.length > 0) {
+        if (!rule.allowedAmountsPaise.includes(amountPaise)) {
+          return {
+            valid: false,
+            reason: `Parameter tampering detected: Amount ₹${(amountPaise / 100).toFixed(2)} is not an authorized fee tier.`,
+          };
+        }
+      }
     } else {
       const min = rule.minAmountPaise ?? 0;
       const max = rule.maxAmountPaise ?? Number.MAX_SAFE_INTEGER;
@@ -1112,6 +1153,25 @@ export class SourceApplicationRegistry {
     }
 
     return { valid: true, rule };
+  }
+
+  /**
+   * Retrieves the raw API secret key for an application code to perform HMAC integrity verification.
+   */
+  public getAppSecret(sourceCode: string): string | null {
+    const rawMap: Record<string, string> = {
+      'CASE_LEAGUE': 'aima_case_league_demo_key_phase3_sandbox_2026',
+      'AMIACRC': 'aima_case_league_demo_key_phase3_sandbox_2026',
+      'MAT': 'aima_mat_demo_key_phase3_sandbox_2026',
+      'CME': 'aima_cme_demo_key_phase3_sandbox_2026',
+      'UGAT': 'aima_ugat_demo_key_phase3_sandbox_2026',
+      'LMA': 'aima_lma_demo_key_phase3_sandbox_2026',
+      'VLC': 'aima_vlc_demo_key_2026',
+      'VCC': 'aima_vcc_demo_key_phase3_sandbox_2026',
+      'EVENTS': 'aima_events_demo_key_phase3_sandbox_2026',
+    };
+    const code = (sourceCode || '').toUpperCase().trim();
+    return rawMap[code] || process.env[`AIMA_SECRET_${code}`] || 'aima_case_league_demo_key_phase3_sandbox_2026';
   }
 
   /**

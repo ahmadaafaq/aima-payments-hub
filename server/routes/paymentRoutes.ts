@@ -4,6 +4,7 @@ import { CCAvenueAdapter } from '../gateways/ccavenue';
 import { HDFCCollectNowAdapter } from '../gateways/hdfcCollectNow';
 import { serverTransactionStore } from '../services/transactionStore';
 import { paymentSessionStore } from '../models/paymentSessions';
+import { sourceApplicationRegistry } from '../models/sourceApplications';
 import { CreateOrderRequest, ServerTransaction } from '../gateways/gatewayTypes';
 
 export const paymentRouter = Router();
@@ -59,6 +60,17 @@ paymentRouter.post('/payments/create-order', (req: Request, res: Response): any 
 
   if (body.totalAmount <= 0) {
     return res.status(400).json({ error: 'Order amount must be greater than zero' });
+  }
+
+  // Registry amount rules validation
+  const app = sourceApplicationRegistry.getBySourceCode(body.applicationCode);
+  if (app) {
+    const purpose = body.courseOrEvent || body.feeDescription || 'REGISTRATION_FEE';
+    const amountPaise = Math.round(body.totalAmount * 100);
+    const amountVal = sourceApplicationRegistry.validateAmount(app, purpose, amountPaise);
+    if (!amountVal.valid) {
+      return res.status(400).json({ error: amountVal.reason || 'Amount validation failed' });
+    }
   }
 
   const now = new Date().toISOString();
@@ -281,6 +293,7 @@ paymentRouter.post('/payments/hdfc-collectnow/verify', async (req: Request, res:
     orderId: razorpay_order_id,
     paymentId: razorpay_payment_id,
     signature: razorpay_signature,
+    expectedAmountPaise: Math.round(txn.totalAmount * 100),
   });
 
   const updatedTxn = await serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
@@ -496,6 +509,7 @@ paymentRouter.all(['/payments/hdfc-collectnow/callback', '/payments/hdfc-collect
     orderId: razorpay_order_id,
     paymentId: razorpay_payment_id,
     signature: razorpay_signature,
+    expectedAmountPaise: txn ? Math.round(txn.totalAmount * 100) : undefined,
   });
 
   if (txn) {
@@ -532,10 +546,16 @@ paymentRouter.all(['/payments/hdfc-collectnow/callback', '/payments/hdfc-collect
     }
     returnUrlObj.searchParams.set('status', verification.status);
     returnUrlObj.searchParams.set('paymentId', razorpay_payment_id);
+    if (txn) {
+      returnUrlObj.searchParams.set('amount', String(txn.totalAmount));
+    }
+    if (verification.status !== 'SUCCESS') {
+      returnUrlObj.searchParams.set('reason', verification.statusReason);
+    }
     finalUrl = returnUrlObj.toString();
   } catch {
     const sep = targetReturnUrl.includes('?') ? '&' : '?';
-    finalUrl = `${targetReturnUrl}${sep}status=${verification.status}&paymentId=${encodeURIComponent(razorpay_payment_id)}${txn ? `&orderId=${encodeURIComponent(txn.orderId)}&reference=${encodeURIComponent(txn.applicationRef)}` : ''}`;
+    finalUrl = `${targetReturnUrl}${sep}status=${verification.status}&paymentId=${encodeURIComponent(razorpay_payment_id)}${txn ? `&orderId=${encodeURIComponent(txn.orderId)}&reference=${encodeURIComponent(txn.applicationRef)}&amount=${encodeURIComponent(String(txn.totalAmount))}` : ''}${verification.status !== 'SUCCESS' ? `&reason=${encodeURIComponent(verification.statusReason)}` : ''}`;
   }
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');

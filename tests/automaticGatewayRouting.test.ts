@@ -398,7 +398,7 @@ runTest('findActivePending returns unexpired pending session for matching source
     customerPhone: '9876543210',
     returnUrl: 'http://localhost:3000',
     selectedGateway: 'CCAVENUE',
-    routingMode: 'EXPLICIT',
+    routingMode: 'AUTO',
     idempotencyKey: 'IDEM-KEY-001',
   });
 
@@ -424,7 +424,7 @@ runTest('findActivePending returns undefined when session is completed or non-ex
     customerPhone: '9876543210',
     returnUrl: 'http://localhost:3000',
     selectedGateway: 'CCAVENUE',
-    routingMode: 'EXPLICIT',
+    routingMode: 'AUTO',
     idempotencyKey: 'IDEM-KEY-002',
   });
 

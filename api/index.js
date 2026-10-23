@@ -211,12 +211,15 @@ var init_sourceApplications = __esm({
               amountRules: [
                 {
                   paymentPurpose: "REGISTRATION_FEE",
-                  description: "Case League & Research Registration Fee",
-                  mode: "VARIABLE",
-                  minAmountPaise: 1e3,
-                  // ₹10
-                  maxAmountPaise: 1e7,
-                  // ₹1,00,000
+                  description: "Case League & Research Registration Fee (\u20B9200 per participant)",
+                  mode: "TIERED_MULTIPLIER",
+                  unitPricePaise: 2e4,
+                  // ₹200.00
+                  minAmountPaise: 2e4,
+                  // Minimum ₹200.00 (1 participant)
+                  maxAmountPaise: 2e6,
+                  // ₹20,000.00 (100 participants)
+                  allowedAmountsPaise: [2e4, 4e4, 6e4, 8e4, 1e5, 12e4, 14e4, 16e4, 18e4, 2e5],
                   currency: "INR",
                   gstApplicable: true
                 },
@@ -623,12 +626,24 @@ var init_sourceApplications = __esm({
               amountRules: [
                 {
                   paymentPurpose: "REGISTRATION_FEE",
-                  description: "Case League Team Registration Fee",
-                  mode: "VARIABLE",
-                  minAmountPaise: 1e3,
-                  // ₹10
-                  maxAmountPaise: 1e7,
-                  // ₹1,00,000
+                  description: "Case League Team Registration Fee (\u20B9200 per participant)",
+                  mode: "TIERED_MULTIPLIER",
+                  unitPricePaise: 2e4,
+                  // ₹200.00 per participant
+                  minAmountPaise: 2e4,
+                  // Minimum ₹200.00 (1 participant)
+                  maxAmountPaise: 2e6,
+                  // ₹20,000.00 (100 participants)
+                  allowedAmountsPaise: [2e4, 4e4, 6e4, 8e4, 1e5, 12e4, 14e4, 16e4, 18e4, 2e5],
+                  currency: "INR",
+                  gstApplicable: true
+                },
+                {
+                  paymentPurpose: "BOOTCAMP_FEE",
+                  description: "Case League Pre-competition Masterclass Fee",
+                  mode: "FIXED",
+                  fixedAmountPaise: 5e4,
+                  // ₹500.00
                   currency: "INR",
                   gstApplicable: true
                 }
@@ -980,6 +995,30 @@ var init_sourceApplications = __esm({
               reason: `Amount mismatch: expected \u20B9${(rule.fixedAmountPaise / 100).toFixed(2)}, got \u20B9${(amountPaise / 100).toFixed(2)}`
             };
           }
+        } else if (rule.mode === "TIERED_MULTIPLIER") {
+          const min = rule.minAmountPaise ?? (rule.unitPricePaise ?? 0);
+          const max = rule.maxAmountPaise ?? Number.MAX_SAFE_INTEGER;
+          const unit = rule.unitPricePaise ?? 2e4;
+          if (amountPaise < min || amountPaise > max) {
+            return {
+              valid: false,
+              reason: `Amount \u20B9${(amountPaise / 100).toFixed(2)} is outside permitted range [\u20B9${(min / 100).toFixed(2)} \u2013 \u20B9${(max / 100).toFixed(2)}] for ${paymentPurpose}`
+            };
+          }
+          if (amountPaise % unit !== 0) {
+            return {
+              valid: false,
+              reason: `Parameter tampering detected: Amount \u20B9${(amountPaise / 100).toFixed(2)} is invalid. Fee must strictly match authoritative unit price \u20B9${(unit / 100).toFixed(2)} per participant (e.g. \u20B9200, \u20B9400, \u20B9600...).`
+            };
+          }
+          if (rule.allowedAmountsPaise && rule.allowedAmountsPaise.length > 0) {
+            if (!rule.allowedAmountsPaise.includes(amountPaise)) {
+              return {
+                valid: false,
+                reason: `Parameter tampering detected: Amount \u20B9${(amountPaise / 100).toFixed(2)} is not an authorized fee tier.`
+              };
+            }
+          }
         } else {
           const min = rule.minAmountPaise ?? 0;
           const max = rule.maxAmountPaise ?? Number.MAX_SAFE_INTEGER;
@@ -991,6 +1030,24 @@ var init_sourceApplications = __esm({
           }
         }
         return { valid: true, rule };
+      }
+      /**
+       * Retrieves the raw API secret key for an application code to perform HMAC integrity verification.
+       */
+      getAppSecret(sourceCode) {
+        const rawMap = {
+          "CASE_LEAGUE": "aima_case_league_demo_key_phase3_sandbox_2026",
+          "AMIACRC": "aima_case_league_demo_key_phase3_sandbox_2026",
+          "MAT": "aima_mat_demo_key_phase3_sandbox_2026",
+          "CME": "aima_cme_demo_key_phase3_sandbox_2026",
+          "UGAT": "aima_ugat_demo_key_phase3_sandbox_2026",
+          "LMA": "aima_lma_demo_key_phase3_sandbox_2026",
+          "VLC": "aima_vlc_demo_key_2026",
+          "VCC": "aima_vcc_demo_key_phase3_sandbox_2026",
+          "EVENTS": "aima_events_demo_key_phase3_sandbox_2026"
+        };
+        const code = (sourceCode || "").toUpperCase().trim();
+        return rawMap[code] || process.env[`AIMA_SECRET_${code}`] || "aima_case_league_demo_key_phase3_sandbox_2026";
       }
       /**
        * Register a new source application (admin-only operation).
@@ -1783,7 +1840,7 @@ var HDFCCollectNowAdapter = class {
    * Verifies payment signature and retrieves payment details
    */
   async verifyPayment(params) {
-    const { orderId, paymentId, signature } = params;
+    const { orderId, paymentId, signature, expectedAmountPaise } = params;
     const keySecret = this.getKeySecret();
     if (!keySecret) {
       throw new Error("HDFC Collect Now key secret not configured");
@@ -1810,9 +1867,22 @@ var HDFCCollectNowAdapter = class {
     } catch (e) {
       console.warn("Could not fetch payment details from Razorpay API:", e);
     }
-    const isCapturedOrAuthorized = paymentDetails?.status === "captured" || paymentDetails?.status === "authorized" || !paymentDetails;
     const bankRef = paymentDetails?.acquirer_data?.rrn || paymentDetails?.acquirer_data?.bank_transaction_id || paymentDetails?.acquirer_data?.auth_code || `HDFC-${paymentId.slice(-8)}`;
     const bankName = paymentDetails?.bank || paymentDetails?.acquirer_data?.bank || (paymentDetails?.method === "upi" ? "UPI / VPA" : "HDFC Bank");
+    if (expectedAmountPaise && paymentDetails && typeof paymentDetails.amount === "number") {
+      if (paymentDetails.amount !== expectedAmountPaise) {
+        console.warn(`[SECURITY ALERT] Gateway Amount Mismatch! Expected: \u20B9${expectedAmountPaise / 100}, Gateway Received: \u20B9${paymentDetails.amount / 100}`);
+        return {
+          isValid: false,
+          status: "FAILED",
+          statusReason: `AMOUNT_MISMATCH: Gateway captured amount \u20B9${(paymentDetails.amount / 100).toFixed(2)} does not match authoritative order amount \u20B9${(expectedAmountPaise / 100).toFixed(2)}. Possible parameter tampering.`,
+          bankReference: bankRef,
+          computedHashMatch: true,
+          rawPayment: paymentDetails
+        };
+      }
+    }
+    const isCapturedOrAuthorized = paymentDetails?.status === "captured" || paymentDetails?.status === "authorized" || !paymentDetails;
     return {
       isValid: true,
       status: isCapturedOrAuthorized ? "SUCCESS" : "FAILED",
@@ -2637,6 +2707,7 @@ var PaymentSessionStore = class {
 var paymentSessionStore = new PaymentSessionStore();
 
 // server/routes/paymentRoutes.ts
+init_sourceApplications();
 var paymentRouter = Router();
 var worldlineAdapter = new WorldlinePaynimoAdapter();
 var ccavenueAdapter = new CCAvenueAdapter();
@@ -2674,6 +2745,15 @@ paymentRouter.post("/payments/create-order", (req, res) => {
   }
   if (body.totalAmount <= 0) {
     return res.status(400).json({ error: "Order amount must be greater than zero" });
+  }
+  const app2 = sourceApplicationRegistry.getBySourceCode(body.applicationCode);
+  if (app2) {
+    const purpose = body.courseOrEvent || body.feeDescription || "REGISTRATION_FEE";
+    const amountPaise = Math.round(body.totalAmount * 100);
+    const amountVal = sourceApplicationRegistry.validateAmount(app2, purpose, amountPaise);
+    if (!amountVal.valid) {
+      return res.status(400).json({ error: amountVal.reason || "Amount validation failed" });
+    }
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const dateStr = now.slice(0, 10).replace(/-/g, "");
@@ -2837,7 +2917,8 @@ paymentRouter.post("/payments/hdfc-collectnow/verify", async (req, res) => {
   const verification = await hdfcCollectNowAdapter.verifyPayment({
     orderId: razorpay_order_id,
     paymentId: razorpay_payment_id,
-    signature: razorpay_signature
+    signature: razorpay_signature,
+    expectedAmountPaise: Math.round(txn.totalAmount * 100)
   });
   const updatedTxn = await serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
     status: verification.status,
@@ -2982,7 +3063,8 @@ paymentRouter.all(["/payments/hdfc-collectnow/callback", "/payments/hdfc-collect
   const verification = await hdfcCollectNowAdapter.verifyPayment({
     orderId: razorpay_order_id,
     paymentId: razorpay_payment_id,
-    signature: razorpay_signature
+    signature: razorpay_signature,
+    expectedAmountPaise: txn ? Math.round(txn.totalAmount * 100) : void 0
   });
   if (txn) {
     await serverTransactionStore.updateVerifiedGatewayTransaction(txn.id, {
@@ -3016,10 +3098,16 @@ paymentRouter.all(["/payments/hdfc-collectnow/callback", "/payments/hdfc-collect
     }
     returnUrlObj.searchParams.set("status", verification.status);
     returnUrlObj.searchParams.set("paymentId", razorpay_payment_id);
+    if (txn) {
+      returnUrlObj.searchParams.set("amount", String(txn.totalAmount));
+    }
+    if (verification.status !== "SUCCESS") {
+      returnUrlObj.searchParams.set("reason", verification.statusReason);
+    }
     finalUrl = returnUrlObj.toString();
   } catch {
     const sep = targetReturnUrl.includes("?") ? "&" : "?";
-    finalUrl = `${targetReturnUrl}${sep}status=${verification.status}&paymentId=${encodeURIComponent(razorpay_payment_id)}${txn ? `&orderId=${encodeURIComponent(txn.orderId)}&reference=${encodeURIComponent(txn.applicationRef)}` : ""}`;
+    finalUrl = `${targetReturnUrl}${sep}status=${verification.status}&paymentId=${encodeURIComponent(razorpay_payment_id)}${txn ? `&orderId=${encodeURIComponent(txn.orderId)}&reference=${encodeURIComponent(txn.applicationRef)}&amount=${encodeURIComponent(String(txn.totalAmount))}` : ""}${verification.status !== "SUCCESS" ? `&reason=${encodeURIComponent(verification.statusReason)}` : ""}`;
   }
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   return res.status(200).send(renderRedirectHtml(finalUrl, verification.status === "SUCCESS" ? "Payment Successful" : "Payment Completed", "Redirecting you back to your application...", verification.status === "SUCCESS"));
@@ -3287,6 +3375,7 @@ function hmacAuthMiddleware(req, res, next) {
 
 // server/routes/v1Routes.ts
 init_sourceApplications();
+init_supabaseClient();
 var v1Router = Router2();
 var worldlineAdapter2 = new WorldlinePaynimoAdapter();
 var ccavenueAdapter2 = new CCAvenueAdapter();
@@ -3399,6 +3488,35 @@ async function handleCommonPay(req, res) {
     };
     return isJson ? res.status(403).json(err) : res.status(403).send(renderErrorHtml("Unregistered Return URL", err.message));
   }
+  const signatureParam = (req.query.signature || req.query.sig || req.query.hmac || "").trim();
+  const timestampParam = (req.query.timestamp || req.query.ts || "").trim();
+  if (signatureParam) {
+    const nowSec = Math.floor(Date.now() / 1e3);
+    const reqSec = parseInt(timestampParam, 10);
+    if (isNaN(reqSec) || Math.abs(nowSec - reqSec) > 1800) {
+      const err = { error: "EXPIRED_PAYMENT_URL", message: "Payment URL timestamp has expired or is outside \xB130 min tolerance. Please re-initiate payment from the portal." };
+      return isJson ? res.status(403).json(err) : res.status(403).send(renderErrorHtml("Expired Payment Signature", err.message));
+    }
+    const appSecret = sourceApplicationRegistry.getAppSecret(sourceApp.sourceCode);
+    if (appSecret) {
+      const canonical = `${sourceApp.sourceCode}:${reference}:${amountStr}:${currency}:${timestampParam}`;
+      const expectedSig = crypto8.createHmac("sha256", appSecret).update(canonical, "utf8").digest("hex");
+      let isValidSig = false;
+      try {
+        isValidSig = crypto8.timingSafeEqual(Buffer.from(signatureParam, "utf8"), Buffer.from(expectedSig, "utf8"));
+      } catch {
+        isValidSig = false;
+      }
+      if (!isValidSig) {
+        console.warn(`[SECURITY ALERT] Parameter tampering detected on /pay initiation! Source: ${sourceApp.sourceCode}, Ref: ${reference}, Tampered Amount: ${amountStr}`);
+        const err = {
+          error: "PARAMETER_TAMPERING_DETECTED",
+          message: "Security Violation: Cryptographic signature mismatch. The request amount or parameters have been modified in transit."
+        };
+        return isJson ? res.status(403).json(err) : res.status(403).send(renderErrorHtml("Security Violation: Parameter Tampering Detected", err.message));
+      }
+    }
+  }
   const amountNum = parseFloat(amountStr);
   if (isNaN(amountNum) || amountNum <= 0) {
     const err = { error: "INVALID_AMOUNT", message: `Amount must be a positive number. Received: '${amountStr}'` };
@@ -3409,6 +3527,26 @@ async function handleCommonPay(req, res) {
     return isJson ? res.status(400).json(err) : res.status(400).send(renderErrorHtml("Invalid Currency", err.message));
   }
   const amountPaise = Math.round(amountNum * 100);
+  if (reference && (sourceApp.sourceCode === "CASE_LEAGUE" || sourceApp.sourceCode === "AMIACRC")) {
+    try {
+      const { data: reg, error: regErr } = await supabaseAdmin.from("registrations").select("registration_number, participant_count, fee_tier, subtotal_amount, total_amount").eq("registration_number", reference).maybeSingle();
+      if (reg && !regErr) {
+        const participantCount = reg.participant_count || 1;
+        const authoritativeAmount = participantCount * 200;
+        const authoritativePaise = authoritativeAmount * 100;
+        if (amountPaise !== authoritativePaise) {
+          console.warn(`[SECURITY ALERT] Request amount tampering detected! Ref: ${reference}, Submitted: \u20B9${amountNum}, Authoritative Server Price: \u20B9${authoritativeAmount} (${participantCount} participants)`);
+          const err = {
+            error: "AMOUNT_TAMPERING_DETECTED",
+            message: `Security Violation: Client submitted amount \u20B9${amountNum.toFixed(2)} does not match server-calculated authoritative amount \u20B9${authoritativeAmount.toFixed(2)} for ${participantCount} participant(s) under registration ${reference}.`
+          };
+          return isJson ? res.status(403).json(err) : res.status(403).send(renderErrorHtml("Security Violation: Amount Tampering Detected", err.message));
+        }
+      }
+    } catch (dbErr) {
+      console.warn("Database authoritative check skipped (offline or network notice):", dbErr);
+    }
+  }
   const amountValidation = sourceApplicationRegistry.validateAmount(sourceApp, paymentPurpose, amountPaise);
   if (!amountValidation.valid) {
     const err = { error: "AMOUNT_VALIDATION_FAILED", message: amountValidation.reason || "Amount validation failed" };
