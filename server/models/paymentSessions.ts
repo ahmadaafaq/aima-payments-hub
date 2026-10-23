@@ -200,9 +200,9 @@ export class PaymentSessionStore {
   }
 
   /** Mark session as completed (payment result received). */
-  public markCompleted(token: string): PaymentSession {
+  public markCompleted(token: string): PaymentSession | null {
     const session = this.sessions.get(token);
-    if (!session) throw new Error(`Session ${token} not found`);
+    if (!session) return null; // Safe for distributed / serverless environments
     if (session.status === 'COMPLETED') return session; // idempotent
 
     const now = new Date().toISOString();

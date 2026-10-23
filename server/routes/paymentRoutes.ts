@@ -367,15 +367,16 @@ paymentRouter.all(['/payments/hdfc-collectnow/callback', '/payments/hdfc-collect
     (query.razorpay_signature as string) ||
     '';
 
-  const tokenParam = ((query.token as string) || body.token || '').trim();
+  const tokenParam = ((query.token as string) || (query['amp;token'] as string) || body.token || '').trim();
   const transactionId = (
     (query.transactionId as string) ||
+    (query['amp;transactionId'] as string) ||
     body.transactionId ||
     body['notes[transaction_id]'] ||
     body?.notes?.transaction_id ||
     ''
   ).trim();
-  const rawTargetReturnUrl = ((query.returnUrl as string) || (body.returnUrl as string) || '').trim();
+  const rawTargetReturnUrl = ((query.returnUrl as string) || (query['amp;returnUrl'] as string) || (body.returnUrl as string) || '').trim();
 
   // Extract error / failure messages from Razorpay
   const errorObj = body.error || {};
@@ -511,10 +512,14 @@ paymentRouter.all(['/payments/hdfc-collectnow/callback', '/payments/hdfc-collect
     });
   }
 
-  if (session && verification.status === 'SUCCESS') {
-    paymentSessionStore.markCompleted(session.sessionToken);
-  } else if (tokenParam && verification.status === 'SUCCESS') {
-    paymentSessionStore.markCompleted(tokenParam);
+  try {
+    if (session && verification.status === 'SUCCESS') {
+      paymentSessionStore.markCompleted(session.sessionToken);
+    } else if (tokenParam && verification.status === 'SUCCESS') {
+      paymentSessionStore.markCompleted(tokenParam);
+    }
+  } catch (err) {
+    console.warn('[PaymentRoutes] Session completion notice:', err);
   }
 
   let finalUrl = targetReturnUrl;

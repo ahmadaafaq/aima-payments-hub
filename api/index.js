@@ -2615,7 +2615,7 @@ var PaymentSessionStore = class {
   /** Mark session as completed (payment result received). */
   markCompleted(token) {
     const session = this.sessions.get(token);
-    if (!session) throw new Error(`Session ${token} not found`);
+    if (!session) return null;
     if (session.status === "COMPLETED") return session;
     const now = (/* @__PURE__ */ new Date()).toISOString();
     session.status = "COMPLETED";
@@ -2886,9 +2886,9 @@ paymentRouter.all(["/payments/hdfc-collectnow/callback", "/payments/hdfc-collect
   const razorpay_order_id = body.razorpay_order_id || body?.error?.metadata?.order_id || body?.["error[metadata][order_id]"] || query.order_id || query.orderId || query.razorpay_order_id || "";
   const razorpay_payment_id = body.razorpay_payment_id || body?.error?.metadata?.payment_id || body?.["error[metadata][payment_id]"] || query.payment_id || query.razorpay_payment_id || "";
   const razorpay_signature = body.razorpay_signature || query.razorpay_signature || "";
-  const tokenParam = (query.token || body.token || "").trim();
-  const transactionId = (query.transactionId || body.transactionId || body["notes[transaction_id]"] || body?.notes?.transaction_id || "").trim();
-  const rawTargetReturnUrl = (query.returnUrl || body.returnUrl || "").trim();
+  const tokenParam = (query.token || query["amp;token"] || body.token || "").trim();
+  const transactionId = (query.transactionId || query["amp;transactionId"] || body.transactionId || body["notes[transaction_id]"] || body?.notes?.transaction_id || "").trim();
+  const rawTargetReturnUrl = (query.returnUrl || query["amp;returnUrl"] || body.returnUrl || "").trim();
   const errorObj = body.error || {};
   const errorCode = errorObj.code || body["error[code]"] || query.error_code || "";
   const errorDescription = errorObj.description || body["error[description]"] || errorObj.reason || body["error[reason]"] || query.error_description || query.reason || "";
@@ -2997,10 +2997,14 @@ paymentRouter.all(["/payments/hdfc-collectnow/callback", "/payments/hdfc-collect
       verificationMethod: "HASH_VALIDATION"
     });
   }
-  if (session && verification.status === "SUCCESS") {
-    paymentSessionStore.markCompleted(session.sessionToken);
-  } else if (tokenParam && verification.status === "SUCCESS") {
-    paymentSessionStore.markCompleted(tokenParam);
+  try {
+    if (session && verification.status === "SUCCESS") {
+      paymentSessionStore.markCompleted(session.sessionToken);
+    } else if (tokenParam && verification.status === "SUCCESS") {
+      paymentSessionStore.markCompleted(tokenParam);
+    }
+  } catch (err) {
+    console.warn("[PaymentRoutes] Session completion notice:", err);
   }
   let finalUrl = targetReturnUrl;
   try {
