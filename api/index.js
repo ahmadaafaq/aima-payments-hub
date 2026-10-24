@@ -219,7 +219,7 @@ var init_sourceApplications = __esm({
                   // Minimum ₹200.00 (1 participant)
                   maxAmountPaise: 2e6,
                   // ₹20,000.00 (100 participants)
-                  allowedAmountsPaise: [2e4, 4e4, 6e4, 8e4, 1e5, 12e4, 14e4, 16e4, 18e4, 2e5],
+                  allowedAmountsPaise: [2e4, 4e4, 6e4, 8e4, 1e5, 12e4, 14e4, 16e4, 18e4, 2e5, 5e4, 15e4, 25e4],
                   currency: "INR",
                   gstApplicable: true
                 },
@@ -634,7 +634,7 @@ var init_sourceApplications = __esm({
                   // Minimum ₹200.00 (1 participant)
                   maxAmountPaise: 2e6,
                   // ₹20,000.00 (100 participants)
-                  allowedAmountsPaise: [2e4, 4e4, 6e4, 8e4, 1e5, 12e4, 14e4, 16e4, 18e4, 2e5],
+                  allowedAmountsPaise: [2e4, 4e4, 6e4, 8e4, 1e5, 12e4, 14e4, 16e4, 18e4, 2e5, 5e4, 15e4, 25e4],
                   currency: "INR",
                   gstApplicable: true
                 },
@@ -1005,10 +1005,13 @@ var init_sourceApplications = __esm({
               reason: `Amount \u20B9${(amountPaise / 100).toFixed(2)} is outside permitted range [\u20B9${(min / 100).toFixed(2)} \u2013 \u20B9${(max / 100).toFixed(2)}] for ${paymentPurpose}`
             };
           }
-          if (amountPaise % unit !== 0) {
+          const isAllowedExplicit = rule.allowedAmountsPaise && rule.allowedAmountsPaise.includes(amountPaise);
+          const isStandardMultiple = amountPaise % unit === 0;
+          const isComparativeMultiple = amountPaise % 5e4 === 0;
+          if (!isAllowedExplicit && !isStandardMultiple && !isComparativeMultiple) {
             return {
               valid: false,
-              reason: `Parameter tampering detected: Amount \u20B9${(amountPaise / 100).toFixed(2)} is invalid. Fee must strictly match authoritative unit price \u20B9${(unit / 100).toFixed(2)} per participant (e.g. \u20B9200, \u20B9400, \u20B9600...).`
+              reason: `Parameter tampering detected: Amount \u20B9${(amountPaise / 100).toFixed(2)} is invalid. Fee must strictly match authorized unit price (\u20B9200 or \u20B9500 per participant).`
             };
           }
           if (rule.allowedAmountsPaise && rule.allowedAmountsPaise.length > 0) {
@@ -3532,7 +3535,8 @@ async function handleCommonPay(req, res) {
       const { data: reg, error: regErr } = await supabaseAdmin.from("registrations").select("registration_number, participant_count, fee_tier, subtotal_amount, total_amount").eq("registration_number", reference).maybeSingle();
       if (reg && !regErr) {
         const participantCount = reg.participant_count || 1;
-        const authoritativeAmount = participantCount * 200;
+        const is500Tier = amountNum === participantCount * 500 || reg.total_amount === participantCount * 500 || reg.subtotal_amount === participantCount * 500 || reg.fee_tier?.includes("500") || reg.fee_tier?.includes("comparative") || reg.fee_tier?.includes("Executive");
+        const authoritativeAmount = is500Tier ? participantCount * 500 : participantCount * 200;
         const authoritativePaise = authoritativeAmount * 100;
         if (amountPaise !== authoritativePaise) {
           console.warn(`[SECURITY ALERT] Request amount tampering detected! Ref: ${reference}, Submitted: \u20B9${amountNum}, Authoritative Server Price: \u20B9${authoritativeAmount} (${participantCount} participants)`);

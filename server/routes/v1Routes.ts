@@ -217,8 +217,16 @@ export async function handleCommonPay(req: Request, res: Response): Promise<any>
 
       if (reg && !regErr) {
         const participantCount = reg.participant_count || 1;
-        // Authoritative server-side price calculation: strictly ₹200 per participant
-        const authoritativeAmount = participantCount * 200;
+        // Authoritative server-side price calculation: strictly supports ₹200 (Standard) and ₹500 (Comparative QA) per participant
+        const is500Tier =
+          amountNum === participantCount * 500 ||
+          reg.total_amount === participantCount * 500 ||
+          reg.subtotal_amount === participantCount * 500 ||
+          reg.fee_tier?.includes('500') ||
+          reg.fee_tier?.includes('comparative') ||
+          reg.fee_tier?.includes('Executive');
+
+        const authoritativeAmount = is500Tier ? participantCount * 500 : participantCount * 200;
         const authoritativePaise = authoritativeAmount * 100;
 
         if (amountPaise !== authoritativePaise) {

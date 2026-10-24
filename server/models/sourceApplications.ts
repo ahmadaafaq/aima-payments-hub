@@ -280,7 +280,7 @@ export class SourceApplicationRegistry {
               unitPricePaise: 20000,     // ₹200.00
               minAmountPaise: 20000,     // Minimum ₹200.00 (1 participant)
               maxAmountPaise: 2000000,   // ₹20,000.00 (100 participants)
-              allowedAmountsPaise: [20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000],
+              allowedAmountsPaise: [20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000, 50000, 150000, 250000],
               currency: 'INR',
               gstApplicable: true,
             },
@@ -678,7 +678,7 @@ export class SourceApplicationRegistry {
               unitPricePaise: 20000,     // ₹200.00 per participant
               minAmountPaise: 20000,     // Minimum ₹200.00 (1 participant)
               maxAmountPaise: 2000000,   // ₹20,000.00 (100 participants)
-              allowedAmountsPaise: [20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000],
+              allowedAmountsPaise: [20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000, 50000, 150000, 250000],
               currency: 'INR',
               gstApplicable: true,
             },
@@ -1126,10 +1126,14 @@ export class SourceApplicationRegistry {
         };
       }
 
-      if (amountPaise % unit !== 0) {
+      const isAllowedExplicit = rule.allowedAmountsPaise && rule.allowedAmountsPaise.includes(amountPaise);
+      const isStandardMultiple = amountPaise % unit === 0;
+      const isComparativeMultiple = amountPaise % 50000 === 0;
+
+      if (!isAllowedExplicit && !isStandardMultiple && !isComparativeMultiple) {
         return {
           valid: false,
-          reason: `Parameter tampering detected: Amount ₹${(amountPaise / 100).toFixed(2)} is invalid. Fee must strictly match authoritative unit price ₹${(unit / 100).toFixed(2)} per participant (e.g. ₹200, ₹400, ₹600...).`,
+          reason: `Parameter tampering detected: Amount ₹${(amountPaise / 100).toFixed(2)} is invalid. Fee must strictly match authorized unit price (₹200 or ₹500 per participant).`,
         };
       }
 
