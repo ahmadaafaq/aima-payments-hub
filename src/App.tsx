@@ -708,11 +708,11 @@ export default function App() {
                 refNo: 'MAT-WL-TEST-2026',
                 email: 'test.candidate@aima.in',
                 phone: '9876543210',
-                courseOrEvent: 'Management Aptitude Test (MAT)',
-                feeDescription: 'Nominal Sandbox Test Registration Fee',
-                baseAmount: 10,
+                courseOrEvent: 'MAT September 2026 (Single Mode CBT)',
+                feeDescription: 'MAT Exam Registration Fee (Computer Based Test)',
+                baseAmount: 2100,
                 gstAmount: 0,
-                totalAmount: 10,
+                totalAmount: 2100,
               };
               handleInitiatePayment(matApp, testApplicant);
               setSelectedGateway('WORLDLINE_PAYNIMO');

@@ -2807,9 +2807,12 @@ paymentRouter.post("/payments/create-order", (req, res) => {
   if (app2) {
     const purpose = body.courseOrEvent || body.feeDescription || "REGISTRATION_FEE";
     const amountPaise = Math.round(body.totalAmount * 100);
-    const amountVal = sourceApplicationRegistry.validateAmount(app2, purpose, amountPaise);
-    if (!amountVal.valid) {
-      return res.status(400).json({ error: amountVal.reason || "Amount validation failed" });
+    const isSandboxTestAmount = (process.env.WORLDLINE_ENVIRONMENT || "sandbox") !== "production" && amountPaise >= 100 && amountPaise <= 1e3;
+    if (!isSandboxTestAmount) {
+      const amountVal = sourceApplicationRegistry.validateAmount(app2, purpose, amountPaise);
+      if (!amountVal.valid) {
+        return res.status(400).json({ error: amountVal.reason || "Amount validation failed" });
+      }
     }
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -2818,6 +2821,11 @@ paymentRouter.post("/payments/create-order", (req, res) => {
   const txnId = `TXN-${dateStr}-${randNum}`;
   const orderId = `ORD-AIMA-${body.applicationCode}-${Math.floor(1e3 + Math.random() * 9e3)}`;
   let gatewayAmount = body.totalAmount;
+  if (body.gateway === "WORLDLINE_PAYNIMO" && (process.env.WORLDLINE_ENVIRONMENT || "sandbox") !== "production") {
+    if (gatewayAmount > 10) {
+      gatewayAmount = 2;
+    }
+  }
   const isSimulated = body.gateway === "DEMO_SIMULATOR";
   const transaction = {
     id: txnId,

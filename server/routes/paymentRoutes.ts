@@ -67,9 +67,17 @@ paymentRouter.post('/payments/create-order', (req: Request, res: Response): any 
   if (app) {
     const purpose = body.courseOrEvent || body.feeDescription || 'REGISTRATION_FEE';
     const amountPaise = Math.round(body.totalAmount * 100);
-    const amountVal = sourceApplicationRegistry.validateAmount(app, purpose, amountPaise);
-    if (!amountVal.valid) {
-      return res.status(400).json({ error: amountVal.reason || 'Amount validation failed' });
+    // In sandbox test environments, permit nominal sandbox test amounts (₹1.00 – ₹10.00)
+    const isSandboxTestAmount =
+      (process.env.WORLDLINE_ENVIRONMENT || 'sandbox') !== 'production' &&
+      amountPaise >= 100 &&
+      amountPaise <= 1000;
+
+    if (!isSandboxTestAmount) {
+      const amountVal = sourceApplicationRegistry.validateAmount(app, purpose, amountPaise);
+      if (!amountVal.valid) {
+        return res.status(400).json({ error: amountVal.reason || 'Amount validation failed' });
+      }
     }
   }
 
@@ -81,6 +89,12 @@ paymentRouter.post('/payments/create-order', (req: Request, res: Response): any 
 
   // Determine gateway amount (actual total fee for real payment processing)
   let gatewayAmount = body.totalAmount;
+  if (body.gateway === 'WORLDLINE_PAYNIMO' && (process.env.WORLDLINE_ENVIRONMENT || 'sandbox') !== 'production') {
+    // In Worldline sandbox test kit, cap charge at nominal ₹2.00 if order amount exceeds sandbox test limit (₹10)
+    if (gatewayAmount > 10) {
+      gatewayAmount = 2.0;
+    }
+  }
 
   const isSimulated = body.gateway === 'DEMO_SIMULATOR';
 
