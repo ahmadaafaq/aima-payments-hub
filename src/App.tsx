@@ -702,7 +702,11 @@ export default function App() {
           <DirectAccessRestricted
             onGoToAdmin={() => setActiveTab('admin')}
             onLaunchTest={() => {
-              const matApp = AIMA_APPLICATIONS.find((a) => a.code === 'MAT') || AIMA_APPLICATIONS[0];
+              const baseApp = AIMA_APPLICATIONS.find((a) => a.code === 'MAT') || AIMA_APPLICATIONS[0];
+              const matApp: AimaApplication = {
+                ...baseApp,
+                assignedGateway: 'WORLDLINE_PAYNIMO',
+              };
               const testApplicant: ApplicantPreset = {
                 name: 'Test Candidate (Worldline Sandbox)',
                 refNo: 'MAT-WL-TEST-2026',
