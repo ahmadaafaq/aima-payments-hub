@@ -1,6 +1,6 @@
 import React from 'react';
 import { AimaLogo } from './AimaLogo';
-import { ShieldCheck, Lock, Shield } from 'lucide-react';
+import { ShieldCheck, Lock, Shield, FlaskConical } from 'lucide-react';
 
 export type ActiveTab = 'restricted' | 'checkout' | 'admin' | 'applications' | 'sync' | 'guide';
 
@@ -50,18 +50,31 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* Right Status Badge */}
-          {activeTab === 'admin' ? (
-            <div className="flex items-center gap-2 text-xs text-amber-300 font-semibold bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
-              <Shield className="w-3.5 h-3.5 text-amber-400" />
-              <span>Institutional Administration Console</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-xs text-emerald-300 font-semibold bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Official Institutional Gateway · 256-Bit SSL</span>
-            </div>
-          )}
+          {/* Right Status Badge & Testing Switch */}
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => onSelectTab(activeTab === 'restricted' ? 'applications' : 'restricted')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-400/15 hover:bg-amber-400/25 text-amber-300 border border-amber-400/30 text-xs font-semibold cursor-pointer transition-all shadow-xs"
+              title="Toggle Gateway Sandbox & Testing Testbed"
+            >
+              <FlaskConical className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden xs:inline">{activeTab === 'restricted' ? 'Sandbox Testbed' : 'Restricted Screen'}</span>
+              <span className="xs:hidden">Testbed</span>
+            </button>
+
+            {activeTab === 'admin' ? (
+              <div className="hidden sm:flex items-center gap-2 text-xs text-amber-300 font-semibold bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
+                <Shield className="w-3.5 h-3.5 text-amber-400" />
+                <span>Institutional Admin</span>
+              </div>
+            ) : (
+              <div className="hidden sm:flex items-center gap-2 text-xs text-emerald-300 font-semibold bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Official Institutional Gateway</span>
+              </div>
+            )}
+          </div>
 
           {/* Optional Dev Mode Only Tabs (Only visible if ?dev=true) */}
           {isDevMode && (

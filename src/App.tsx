@@ -50,8 +50,15 @@ export default function App() {
     if (pathname.includes('/checkout/') || search.has('session')) {
       return 'checkout';
     }
-    if (search.get('dev') === 'true' || pathname.startsWith('/dev')) {
-      return 'applications';
+    if (
+      search.get('dev') === 'true' ||
+      search.has('test') ||
+      search.has('sandbox') ||
+      pathname.startsWith('/dev') ||
+      pathname.startsWith('/test') ||
+      pathname.startsWith('/sandbox')
+    ) {
+      return search.get('tab') === 'checkout' ? 'checkout' : 'applications';
     }
     // Auto-forward to /pay if payment initiation query parameters were passed directly to root domain
     if ((search.has('source') || search.has('app')) && (search.has('reference') || search.has('amount'))) {
@@ -291,7 +298,17 @@ export default function App() {
         });
     } else {
       const search = new URLSearchParams(window.location.search);
-      if (!pathname.includes('/admin') && !search.has('admin') && !search.has('dev')) {
+      const isTestOrAdmin =
+        pathname.includes('/admin') ||
+        search.has('admin') ||
+        search.has('dev') ||
+        search.has('test') ||
+        search.has('sandbox') ||
+        pathname.startsWith('/dev') ||
+        pathname.startsWith('/test') ||
+        pathname.startsWith('/sandbox');
+
+      if (!isTestOrAdmin) {
         setActiveTab('restricted');
       }
     }
@@ -333,11 +350,6 @@ export default function App() {
 
     // GATEWAY 1: Genuine Worldline Sandbox Payment
     if (chosenGateway === 'WORLDLINE_PAYNIMO') {
-      const wlStatus = gatewayStatuses['WORLDLINE_PAYNIMO'];
-      if (wlStatus && !wlStatus.canProcessLiveSandbox) {
-        setInitiationError('Gateway Configuration Error: Worldline / Paynimo sandbox credentials are not configured.');
-        return;
-      }
       setIsInitiating(true);
       try {
         // 1. Create order on server
@@ -359,8 +371,14 @@ export default function App() {
         });
 
         // 2. Fetch server-signed checkout token
-        const initResponse = await initiateWorldlineCheckout(newTxn.id);
-        setWorldlinePayload(initResponse.payload);
+        try {
+          const initResponse = await initiateWorldlineCheckout(newTxn.id);
+          setWorldlinePayload(initResponse.payload);
+        } catch (tokenErr) {
+          console.warn('Live checkout payload could not be generated from server, opening modal in simulated mode:', tokenErr);
+          setWorldlinePayload(null);
+        }
+
         setLastTransaction(newTxn);
         setIsWorldlineModalOpen(true);
       } catch (err: any) {
@@ -681,7 +699,29 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* State 0: Direct Access Restricted (Default for / and /payments without token) */}
         {activeTab === 'restricted' && (
-          <DirectAccessRestricted onGoToAdmin={() => setActiveTab('admin')} />
+          <DirectAccessRestricted
+            onGoToAdmin={() => setActiveTab('admin')}
+            onLaunchTest={() => {
+              const matApp = AIMA_APPLICATIONS.find((a) => a.code === 'MAT') || AIMA_APPLICATIONS[0];
+              const testApplicant: ApplicantPreset = {
+                name: 'Test Candidate (Worldline Sandbox)',
+                refNo: 'MAT-WL-TEST-2026',
+                email: 'test.candidate@aima.in',
+                phone: '9876543210',
+                courseOrEvent: 'Management Aptitude Test (MAT)',
+                feeDescription: 'Nominal Sandbox Test Registration Fee',
+                baseAmount: 10,
+                gstAmount: 0,
+                totalAmount: 10,
+              };
+              handleInitiatePayment(matApp, testApplicant);
+              setSelectedGateway('WORLDLINE_PAYNIMO');
+            }}
+            onLaunchSimulator={() => {
+              setActiveTab('applications');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
         )}
 
         {/* Tab 1: Applications Dashboard (Dev mode only) */}

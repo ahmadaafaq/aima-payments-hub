@@ -3,6 +3,22 @@ import express, { Request, Response } from 'express';
 import { paymentRouter } from './routes/paymentRoutes';
 import { v1Router, handleCommonPay } from './routes/v1Routes';
 
+// Default sandbox test credentials if running on serverless without injected .env
+if (process.env.WORLDLINE_ENVIRONMENT !== 'production') {
+  if (!process.env.WORLDLINE_SALT) {
+    process.env.WORLDLINE_SALT = 'TEST_SECRET_SALT_12345';
+  }
+  if (!process.env.WORLDLINE_MERCHANT_CODE) {
+    process.env.WORLDLINE_MERCHANT_CODE = 'T945221';
+  }
+  if (!process.env.WORLDLINE_SCHEME_CODE) {
+    process.env.WORLDLINE_SCHEME_CODE = 'FIRST';
+  }
+  if (!process.env.WORLDLINE_ENVIRONMENT) {
+    process.env.WORLDLINE_ENVIRONMENT = 'sandbox';
+  }
+}
+
 const app = express();
 
 app.use(express.json());

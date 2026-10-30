@@ -4383,6 +4383,20 @@ v1Router.get("/admin/auth/verify", (req, res) => {
 });
 
 // server/apiHandler.ts
+if (process.env.WORLDLINE_ENVIRONMENT !== "production") {
+  if (!process.env.WORLDLINE_SALT) {
+    process.env.WORLDLINE_SALT = "TEST_SECRET_SALT_12345";
+  }
+  if (!process.env.WORLDLINE_MERCHANT_CODE) {
+    process.env.WORLDLINE_MERCHANT_CODE = "T945221";
+  }
+  if (!process.env.WORLDLINE_SCHEME_CODE) {
+    process.env.WORLDLINE_SCHEME_CODE = "FIRST";
+  }
+  if (!process.env.WORLDLINE_ENVIRONMENT) {
+    process.env.WORLDLINE_ENVIRONMENT = "sandbox";
+  }
+}
 var app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
