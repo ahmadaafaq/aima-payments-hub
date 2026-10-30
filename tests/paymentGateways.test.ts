@@ -130,6 +130,93 @@ runTest('Should verify aborted/cancelled response code 0392', () => {
   assert.strictEqual(verified.status, 'CANCELLED');
 });
 
+// 7b. Dual hash verification: valid response token matches recomputed hash
+runTest('Should validate response when token matches recomputed SHA-256 hash', () => {
+  process.env.WORLDLINE_SALT = 'TEST_SECRET_SALT_12345';
+  const adapter = new WorldlinePaynimoAdapter();
+
+  // Use the adapter's own generateCheckoutHash to compute the expected token
+  // This validates the round-trip: same inputs → same hash on both request and response
+  const expectedHash = adapter.generateCheckoutHash({
+    merchantId: 'T945221',
+    txnId: 'TXN-HASH-TEST',
+    amount: '2.00',
+    consumerId: 'CUST_001',
+    consumerMobileNo: '9811245890',
+    consumerEmailId: 'test@aima.in',
+  });
+
+  const mockResponse = {
+    paymentMethod: {
+      paymentTransaction: {
+        statusCode: '0300',
+        statusMessage: 'Transaction Successful',
+        merchantTransactionIdentifier: 'TXN-HASH-TEST',
+        merchantId: 'T945221',
+        amount: '2.00',
+        consumerId: 'CUST_001',
+        consumerMobileNo: '9811245890',
+        consumerEmailId: 'test@aima.in',
+        bankReferenceIdentifier: 'BANK-REF-HASH-01',
+      },
+    },
+    token: expectedHash,
+  };
+
+  const verified = adapter.verifyResponse(mockResponse);
+  assert.strictEqual(verified.computedHashMatch, true);
+  assert.strictEqual(verified.isValid, true);
+  assert.strictEqual(verified.status, 'SUCCESS');
+});
+
+// 7c. Dual hash verification: tampered token demotes SUCCESS to FAILED
+runTest('Should demote SUCCESS to FAILED when response token is tampered', () => {
+  process.env.WORLDLINE_SALT = 'TEST_SECRET_SALT_12345';
+  const adapter = new WorldlinePaynimoAdapter();
+
+  const mockResponse = {
+    paymentMethod: {
+      paymentTransaction: {
+        statusCode: '0300',
+        statusMessage: 'Transaction Successful',
+        merchantTransactionIdentifier: 'TXN-TAMPER-TEST',
+        merchantId: 'T945221',
+        amount: '2.00',
+        consumerId: 'CUST_001',
+        consumerMobileNo: '9811245890',
+        consumerEmailId: 'test@aima.in',
+      },
+    },
+    token: 'aaaaaabbbbbbccccccddddddeeeeeeffffffgggggghhhhhhiiiiiijjjjjjkk',
+  };
+
+  const verified = adapter.verifyResponse(mockResponse);
+  assert.strictEqual(verified.computedHashMatch, false);
+  assert.strictEqual(verified.isValid, false);
+  assert.strictEqual(verified.status, 'FAILED'); // Demoted from SUCCESS
+});
+
+// 7d. Responses without token (legacy sandbox) skip hash check gracefully
+runTest('Should skip hash verification when no response token is present', () => {
+  process.env.WORLDLINE_SALT = 'TEST_SECRET_SALT_12345';
+  const adapter = new WorldlinePaynimoAdapter();
+
+  const mockResponse = {
+    paymentMethod: {
+      paymentTransaction: {
+        statusCode: '0300',
+        statusMessage: 'Transaction Successful via Sandbox',
+      },
+    },
+    // No token field — simulated or legacy response
+  };
+
+  const verified = adapter.verifyResponse(mockResponse);
+  assert.strictEqual(verified.computedHashMatch, true); // Defaults to true when no token
+  assert.strictEqual(verified.isValid, true);
+  assert.strictEqual(verified.status, 'SUCCESS');
+});
+
 // -----------------------------------------------------------------------------
 // TEST SUITE 2: CCAvenue Adapter & Live Kit Safety
 // -----------------------------------------------------------------------------

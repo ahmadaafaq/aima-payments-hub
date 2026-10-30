@@ -53,6 +53,11 @@ export default function App() {
     if (search.get('dev') === 'true' || pathname.startsWith('/dev')) {
       return 'applications';
     }
+    // Auto-forward to /pay if payment initiation query parameters were passed directly to root domain
+    if ((search.has('source') || search.has('app')) && (search.has('reference') || search.has('amount'))) {
+      window.location.replace(`/pay${window.location.search}`);
+      return 'restricted';
+    }
     // Direct access to / or /payments without active checkout session or admin is restricted
     return 'restricted';
   };

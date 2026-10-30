@@ -268,13 +268,96 @@ export class WorldlinePaynimoAdapter {
       responsePayload?.bankName ||
       'Test Sandbox Bank';
 
-    // Verify hash if response token / hash is provided
+    // ── Dual SHA-256 Response Token Verification ──────────────────────────────
+    // Paynimo sends back a token in the response computed from the same pipe-delimited
+    // formula used during checkout initiation. We recompute the expected hash from the
+    // response fields and compare using constant-time comparison to prevent timing attacks.
     let computedHashMatch = true;
-    if (this.salt && responsePayload?.token) {
-      // In Paynimo dual verification, response hash check
-      // For verification, if response token is supplied, calculate expected verification hash
-      computedHashMatch = true;
+    const responseToken = responsePayload?.token || responsePayload?.hash || '';
+    const salt = this.getSalt();
+
+    if (responseToken && salt) {
+      // Extract fields from response to recompute verification hash
+      const respMerchantId =
+        pMethod?.paymentTransaction?.merchantId ||
+        responsePayload?.merchantId ||
+        this.getMerchantCode();
+      const respTxnId =
+        pMethod?.paymentTransaction?.merchantTransactionIdentifier ||
+        responsePayload?.merchantTxnId ||
+        responsePayload?.txnId ||
+        '';
+      const respAmount =
+        pMethod?.paymentTransaction?.amount ||
+        responsePayload?.amount ||
+        '';
+      const respAccountNo =
+        pMethod?.paymentTransaction?.accountNo ||
+        responsePayload?.accountNo ||
+        '';
+      const respConsumerId =
+        pMethod?.paymentTransaction?.consumerId ||
+        responsePayload?.consumerId ||
+        '';
+      const respMobile =
+        pMethod?.paymentTransaction?.consumerMobileNo ||
+        responsePayload?.consumerMobileNo ||
+        '';
+      const respEmail =
+        pMethod?.paymentTransaction?.consumerEmailId ||
+        responsePayload?.consumerEmailId ||
+        '';
+
+      // Recompute hash using same pipe-delimited formula as checkout initiation
+      const verificationFields = [
+        respMerchantId,
+        respTxnId,
+        String(respAmount),
+        respAccountNo,
+        respConsumerId,
+        respMobile,
+        respEmail,
+        '', // debitStartDate (not in response)
+        '', // debitEndDate
+        '', // maxAmount
+        '', // amountType
+        '', // frequency
+        '', // cardNumber
+        '', // expMonth
+        '', // expYear
+        '', // cvvCode
+        salt,
+      ];
+
+      const expectedHash = crypto
+        .createHash('sha256')
+        .update(verificationFields.join('|'), 'utf8')
+        .digest('hex');
+
+      // Constant-time comparison to prevent timing side-channel attacks
+      try {
+        computedHashMatch = crypto.timingSafeEqual(
+          Buffer.from(responseToken, 'utf8'),
+          Buffer.from(expectedHash, 'utf8')
+        );
+      } catch {
+        // Buffer length mismatch means tokens don't match
+        computedHashMatch = false;
+      }
+
+      if (!computedHashMatch) {
+        console.warn(
+          `[SECURITY] Worldline response token mismatch! TxnId: ${respTxnId}. ` +
+          `Expected hash prefix: ${expectedHash.substring(0, 12)}..., ` +
+          `Received token prefix: ${responseToken.substring(0, 12)}...`
+        );
+      }
+    } else if (responseToken && !salt) {
+      // Token was provided by Worldline but we have no SALT to verify — flag as unverified
+      console.warn('[SECURITY] Worldline response contains token but WORLDLINE_SALT is not configured — cannot verify');
+      computedHashMatch = false;
     }
+    // If no responseToken present (e.g. sandbox simulated responses), skip hash check gracefully
 
     let status: 'SUCCESS' | 'FAILED' | 'PENDING' | 'CANCELLED' = 'FAILED';
 
@@ -288,9 +371,12 @@ export class WorldlinePaynimoAdapter {
       status = 'FAILED';
     }
 
+    // If hash verification failed on a success response, demote to FAILED for safety
+    const isResponseIntegrityValid = computedHashMatch || !responseToken;
+
     return {
-      isValid: true,
-      status,
+      isValid: isResponseIntegrityValid,
+      status: (!isResponseIntegrityValid && status === 'SUCCESS') ? 'FAILED' : status,
       gatewayStatusCode: statusCode,
       statusReason: statusMsg || `Worldline status code ${statusCode}`,
       bankReference: bankRef || undefined,
