@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TransactionRecord } from '../types/payment';
 import { formatINR } from '../services/paymentStorage';
 import { 
@@ -148,8 +148,6 @@ export const WorldlineSandboxModal: React.FC<WorldlineSandboxModalProps> = ({
     };
   }, [isOpen, checkoutPayload, onSandboxResponse]);
 
-  if (!isOpen) return null;
-
   const consumerData = checkoutPayload?.consumerData;
   const testAmount = consumerData?.items?.[0]?.amount || '2.00';
   const schemeCode = consumerData?.items?.[0]?.itemId || 'FIRST';
@@ -159,7 +157,7 @@ export const WorldlineSandboxModal: React.FC<WorldlineSandboxModalProps> = ({
   const canUseLiveSdk = isSdkReady && useLiveSdk;
 
   // ── Launch Live Paynimo SDK Checkout ────────────────────────────────────────
-  const handleLiveSdkCheckout = useCallback(() => {
+  const handleLiveSdkCheckout = () => {
     const $ = (window as any).jQuery || (window as any).$;
     if (!$ || typeof $.pnCheckout !== 'function') {
       setSdkError('$.pnCheckout is not available. Falling back to simulated mode.');
@@ -205,7 +203,7 @@ export const WorldlineSandboxModal: React.FC<WorldlineSandboxModalProps> = ({
       setLiveSdkLaunched(false);
       setUseLiveSdk(false);
     }
-  }, [checkoutPayload, consumerData, liveSdkLaunched]);
+  };
 
   // ── Simulated Bank Response (Fallback) ─────────────────────────────────────
   const handleTestBankSubmit = (outcome: '0300' | '0399' | '0396' | '0392') => {
@@ -262,6 +260,8 @@ export const WorldlineSandboxModal: React.FC<WorldlineSandboxModalProps> = ({
       onSandboxResponse(payload);
     }, 1200);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">

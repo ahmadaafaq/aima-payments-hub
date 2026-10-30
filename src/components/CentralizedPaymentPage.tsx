@@ -304,56 +304,6 @@ export const CentralizedPaymentPage: React.FC<CentralizedPaymentPageProps> = ({
               </div>
             </div>
 
-            {/* Gateway Selection Switch */}
-            <div className="mb-6 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">
-                  Select Payment Processor
-                </span>
-                <span className="text-[10px] text-amber-600 font-medium">Sandbox Testbed</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                {/* Worldline Paynimo Option */}
-                <button
-                  type="button"
-                  onClick={() => onSelectGateway('WORLDLINE_PAYNIMO')}
-                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
-                    selectedGateway === 'WORLDLINE_PAYNIMO'
-                      ? 'border-[#002b49] bg-blue-50/80 ring-2 ring-[#002b49]/20 shadow-xs'
-                      : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-slate-900">Worldline</span>
-                    {selectedGateway === 'WORLDLINE_PAYNIMO' && (
-                      <CheckCircle2 className="w-4 h-4 text-[#002b49]" />
-                    )}
-                  </div>
-                  <span className="text-[11px] text-slate-500 block leading-tight">Paynimo SDK (Ingenico)</span>
-                </button>
-
-                {/* HDFC Collect Now Option */}
-                <button
-                  type="button"
-                  onClick={() => onSelectGateway('CCAVENUE')}
-                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
-                    selectedGateway === 'CCAVENUE'
-                      ? 'border-[#002b49] bg-blue-50/80 ring-2 ring-[#002b49]/20 shadow-xs'
-                      : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-slate-900">HDFC Bank</span>
-                    {selectedGateway === 'CCAVENUE' && (
-                      <CheckCircle2 className="w-4 h-4 text-[#002b49]" />
-                    )}
-                  </div>
-                  <span className="text-[11px] text-slate-500 block leading-tight">Collect Now (Razorpay)</span>
-                </button>
-              </div>
-            </div>
-
             {/* Prominent Checkout Button */}
             <div>
               <button
@@ -363,9 +313,7 @@ export const CentralizedPaymentPage: React.FC<CentralizedPaymentPageProps> = ({
                 className="w-full py-4 px-4 rounded-xl font-bold text-base tracking-wide shadow-md transition-all flex items-center justify-center gap-2 bg-[#002b49] hover:bg-[#003860] active:scale-[0.99] text-white cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Lock className="w-4 h-4 text-amber-400 group-hover:text-amber-300" />
-                <span>
-                  Proceed via {selectedGateway === 'WORLDLINE_PAYNIMO' ? 'Worldline Paynimo' : 'HDFC Collect Now'} ({formatINR(applicant.totalAmount)})
-                </span>
+                <span>Proceed to Pay {formatINR(applicant.totalAmount)}</span>
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </button>
 

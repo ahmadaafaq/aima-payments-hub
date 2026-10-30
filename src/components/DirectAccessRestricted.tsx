@@ -58,7 +58,7 @@ export const DirectAccessRestricted: React.FC<DirectAccessRestrictedProps> = ({
                   Testing the Payment Gateway Integration?
                 </h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Launch a verified sample transaction (e.g. ₹10.00 MAT Exam fee) to test Worldline/Paynimo live checkout, dual-hash verification, and status callback handling.
+                  Launch a verified sample transaction (₹2.00 nominal test fee as instructed by the Paynimo onboarding team) to test Worldline live checkout and status callbacks.
                 </p>
               </div>
 

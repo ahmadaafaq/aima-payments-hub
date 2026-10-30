@@ -988,6 +988,9 @@ var init_sourceApplications = __esm({
         if (!rule) {
           return { valid: false, reason: `No amount rule configured for purpose: ${paymentPurpose}` };
         }
+        if (process.env.WORLDLINE_ENVIRONMENT !== "production" && amountPaise >= 100 && amountPaise <= 1e3) {
+          return { valid: true, rule };
+        }
         if (rule.mode === "FIXED") {
           if (amountPaise !== rule.fixedAmountPaise) {
             return {

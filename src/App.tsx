@@ -702,23 +702,23 @@ export default function App() {
           <DirectAccessRestricted
             onGoToAdmin={() => setActiveTab('admin')}
             onLaunchTest={() => {
-              const baseApp = AIMA_APPLICATIONS.find((a) => a.code === 'MAT') || AIMA_APPLICATIONS[0];
-              const matApp: AimaApplication = {
+              const baseApp = AIMA_APPLICATIONS.find((a) => a.code === 'VLC') || AIMA_APPLICATIONS[0];
+              const testApp: AimaApplication = {
                 ...baseApp,
                 assignedGateway: 'WORLDLINE_PAYNIMO',
               };
               const testApplicant: ApplicantPreset = {
                 name: 'Test Candidate (Worldline Sandbox)',
-                refNo: 'MAT-WL-TEST-2026',
+                refNo: 'WL-TEST-UAT-2026',
                 email: 'test.candidate@aima.in',
                 phone: '9876543210',
-                courseOrEvent: 'MAT September 2026 (Single Mode CBT)',
-                feeDescription: 'MAT Exam Registration Fee (Computer Based Test)',
-                baseAmount: 2100,
+                courseOrEvent: 'Worldline Paynimo Test Verification',
+                feeDescription: 'Sandbox Test Fee (Merchant T945221)',
+                baseAmount: 2,
                 gstAmount: 0,
-                totalAmount: 2100,
+                totalAmount: 2,
               };
-              handleInitiatePayment(matApp, testApplicant);
+              handleInitiatePayment(testApp, testApplicant);
               setSelectedGateway('WORLDLINE_PAYNIMO');
             }}
             onLaunchSimulator={() => {

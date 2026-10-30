@@ -1107,6 +1107,11 @@ export class SourceApplicationRegistry {
       return { valid: false, reason: `No amount rule configured for purpose: ${paymentPurpose}` };
     }
 
+    // Permit nominal sandbox test amounts (₹1.00 – ₹10.00) in non-production environments
+    if (process.env.WORLDLINE_ENVIRONMENT !== 'production' && amountPaise >= 100 && amountPaise <= 1000) {
+      return { valid: true, rule };
+    }
+
     if (rule.mode === 'FIXED') {
       if (amountPaise !== rule.fixedAmountPaise) {
         return {
