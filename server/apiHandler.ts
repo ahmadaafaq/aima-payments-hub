@@ -5,11 +5,13 @@ import { v1Router, handleCommonPay } from './routes/v1Routes';
 
 // Default sandbox test credentials if running on serverless without injected .env
 if (process.env.WORLDLINE_ENVIRONMENT !== 'production') {
-  if (!process.env.WORLDLINE_SALT) {
-    process.env.WORLDLINE_SALT = 'TEST_SECRET_SALT_12345';
-  }
   if (!process.env.WORLDLINE_MERCHANT_CODE) {
-    process.env.WORLDLINE_MERCHANT_CODE = 'T945221';
+    process.env.WORLDLINE_MERCHANT_CODE = 'T1202993';
+  }
+  if (!process.env.WORLDLINE_SALT) {
+    process.env.WORLDLINE_SALT = process.env.WORLDLINE_MERCHANT_CODE === 'T945221'
+      ? '5174857326WJPKBR'
+      : '5367530737NPUJCA';
   }
   if (!process.env.WORLDLINE_SCHEME_CODE) {
     process.env.WORLDLINE_SCHEME_CODE = 'FIRST';

@@ -245,13 +245,14 @@ runTest('CCAvenue adapter reports CONFIG_REQUIRED when test keys are missing', (
   if (oldKey) process.env.CCAVENUE_WORKING_KEY = oldKey;
 });
 
-runTest('Worldline Paynimo adapter reports live sandbox ready when T945221 configured', () => {
-  process.env.WORLDLINE_SALT = 'TEST_SECRET_SALT_12345';
+runTest('Worldline Paynimo adapter reports live sandbox ready when T1202993 configured', () => {
+  process.env.WORLDLINE_MERCHANT_CODE = 'T1202993';
+  process.env.WORLDLINE_SALT = '5367530737NPUJCA';
   process.env.WORLDLINE_ENVIRONMENT = 'sandbox';
   const wlAdapter = new WorldlinePaynimoAdapter();
   const status = wlAdapter.getStatus();
   assert.strictEqual(status.canProcessLiveSandbox, true);
-  assert.strictEqual(status.configuredDetails?.merchantId, 'T945221');
+  assert.strictEqual(status.configuredDetails?.merchantId, 'T1202993');
 });
 
 // ─── Suite 5: Payment Session Creation & Persisted Gateway ───────────────────

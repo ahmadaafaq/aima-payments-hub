@@ -88,7 +88,7 @@ export default function App() {
       statusLabel: 'Sandbox Configured',
       canProcessLiveSandbox: true,
       configuredDetails: {
-        merchantId: 'T945221',
+        merchantId: 'T1202993',
         schemeCode: 'FIRST',
         testAmountLimits: '₹1.00 – ₹10.00',
         testCredentialsHint: 'Bank login: test / test',
@@ -713,7 +713,7 @@ export default function App() {
                 email: 'test.candidate@aima.in',
                 phone: '9876543210',
                 courseOrEvent: 'Worldline Paynimo Test Verification',
-                feeDescription: 'Sandbox Test Fee (Merchant T945221)',
+                feeDescription: 'Sandbox Test Fee (Merchant T1202993)',
                 baseAmount: 2,
                 gstAmount: 0,
                 totalAmount: 2,

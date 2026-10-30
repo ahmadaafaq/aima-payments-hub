@@ -58,54 +58,29 @@
     ]
   },
   {
-    "id": "TXN-SANDBOX-001",
-    "orderId": "ORD-AIMA-MAT-9901",
-    "applicationId": "mat",
-    "applicationCode": "MAT",
-    "applicationName": "Management Aptitude Test",
-    "applicationRef": "MAT-2026-TEST",
-    "applicantName": "Test Applicant",
-    "applicantEmail": "test@aima.in",
-    "applicantPhone": "+91 98112 00000",
-    "courseOrEvent": "MAT September",
-    "feeDescription": "Exam Fee",
-    "baseAmount": 3500,
-    "gstAmount": 0,
-    "totalAmount": 3500,
+    "id": "TXN-ROUTING-002",
+    "orderId": "ORD-AIMA-LMA-902",
+    "applicationId": "src-lma-001",
+    "applicationCode": "LMA",
+    "applicationName": "Local Management Associations",
+    "applicationRef": "LMA-REG-441",
+    "applicantName": "DMA Delegate",
+    "applicantEmail": "dma@lma.in",
+    "applicantPhone": "+91 11 2464 1234",
+    "courseOrEvent": "SUBSCRIPTION_FEE",
+    "feeDescription": "Annual LMA Affiliation",
+    "baseAmount": 20000,
+    "gstAmount": 3600,
+    "totalAmount": 23600,
     "gatewayAmount": 2,
     "currency": "INR",
     "gateway": "WORLDLINE_PAYNIMO",
     "gatewayEnvironment": "sandbox",
     "isSimulated": false,
-    "status": "SUCCESS",
-    "createdAt": "2026-10-30T11:59:30.727Z",
-    "idempotencyKey": "IDEM-TEST-001",
-    "callbackDelivered": true,
-    "auditTrail": [
-      {
-        "step": "Gateway Verification (SUCCESS)",
-        "timestamp": "2026-10-30T11:59:30.730Z",
-        "detail": "Verified via HASH_VALIDATION. Bank Ref: WL-BANK-882201. Reason: Nominal",
-        "status": "ok"
-      },
-      {
-        "step": "S2S Notification Queued",
-        "timestamp": "2026-10-30T11:59:30.730Z",
-        "detail": "Signed notification EVT-1793361570736-D6BA48791C62 queued for delivery to https://mat.aima.in/api/v1/payment-notification",
-        "status": "ok"
-      }
-    ],
-    "bankReference": "WL-BANK-882201",
-    "authCode": "AUTH-WL-9912",
-    "gatewayTransactionId": "WL-GATEWAY-123",
-    "completedAt": "2026-10-30T11:59:30.730Z",
-    "verifiedAt": "2026-10-30T11:59:30.730Z",
-    "verificationMethod": "HASH_VALIDATION",
-    "callbackResponse": {
-      "httpStatus": 200,
-      "deliveredAt": "2026-10-30T11:59:30.730Z",
-      "targetUrl": "https://mat.aima.in/api/v1/payment-notification",
-      "payloadSnippet": "{\"eventId\":\"EVT-1793361570736-D6BA48791C62\",\"orderId\":\"ORD-AIMA-MAT-9901\",\"status\":\"SUCCESS\",\"gateway\":\"WORLDLINE_PAYNIMO\",\"amountPaise\":350000,\"signedAt\":\"2026-10-30T11:59:30.736Z\"}"
-    }
+    "status": "PENDING",
+    "createdAt": "2026-10-30T14:31:41.963Z",
+    "idempotencyKey": "IDEM-LMA-002",
+    "callbackDelivered": false,
+    "auditTrail": []
   }
 ]

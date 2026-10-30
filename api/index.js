@@ -1296,15 +1296,15 @@ import crypto from "crypto";
 var WorldlinePaynimoAdapter = class {
   constructor() {
     this.environment = (process.env.WORLDLINE_ENVIRONMENT || "sandbox").toLowerCase();
-    this.merchantCode = process.env.WORLDLINE_MERCHANT_CODE || "T945221";
+    this.merchantCode = process.env.WORLDLINE_MERCHANT_CODE || "T1202993";
     this.schemeCode = process.env.WORLDLINE_SCHEME_CODE || "FIRST";
-    this.salt = process.env.WORLDLINE_SALT || "";
+    this.salt = process.env.WORLDLINE_SALT || (this.merchantCode === "T945221" ? "5174857326WJPKBR" : "5367530737NPUJCA");
   }
   getEnvironment() {
     return (process.env.WORLDLINE_ENVIRONMENT || "sandbox").toLowerCase();
   }
   getMerchantCode() {
-    return process.env.WORLDLINE_MERCHANT_CODE || "T945221";
+    return process.env.WORLDLINE_MERCHANT_CODE || "T1202993";
   }
   getSchemeCode() {
     return process.env.WORLDLINE_SCHEME_CODE || "FIRST";
@@ -4395,11 +4395,11 @@ v1Router.get("/admin/auth/verify", (req, res) => {
 
 // server/apiHandler.ts
 if (process.env.WORLDLINE_ENVIRONMENT !== "production") {
-  if (!process.env.WORLDLINE_SALT) {
-    process.env.WORLDLINE_SALT = "TEST_SECRET_SALT_12345";
-  }
   if (!process.env.WORLDLINE_MERCHANT_CODE) {
-    process.env.WORLDLINE_MERCHANT_CODE = "T945221";
+    process.env.WORLDLINE_MERCHANT_CODE = "T1202993";
+  }
+  if (!process.env.WORLDLINE_SALT) {
+    process.env.WORLDLINE_SALT = process.env.WORLDLINE_MERCHANT_CODE === "T945221" ? "5174857326WJPKBR" : "5367530737NPUJCA";
   }
   if (!process.env.WORLDLINE_SCHEME_CODE) {
     process.env.WORLDLINE_SCHEME_CODE = "FIRST";

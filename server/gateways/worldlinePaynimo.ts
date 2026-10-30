@@ -9,9 +9,9 @@ export class WorldlinePaynimoAdapter {
 
   constructor() {
     this.environment = (process.env.WORLDLINE_ENVIRONMENT || 'sandbox').toLowerCase();
-    this.merchantCode = process.env.WORLDLINE_MERCHANT_CODE || 'T945221';
+    this.merchantCode = process.env.WORLDLINE_MERCHANT_CODE || 'T1202993';
     this.schemeCode = process.env.WORLDLINE_SCHEME_CODE || 'FIRST';
-    this.salt = process.env.WORLDLINE_SALT || '';
+    this.salt = process.env.WORLDLINE_SALT || (this.merchantCode === 'T945221' ? '5174857326WJPKBR' : '5367530737NPUJCA');
   }
 
   public getEnvironment(): string {
@@ -19,7 +19,7 @@ export class WorldlinePaynimoAdapter {
   }
 
   public getMerchantCode(): string {
-    return process.env.WORLDLINE_MERCHANT_CODE || 'T945221';
+    return process.env.WORLDLINE_MERCHANT_CODE || 'T1202993';
   }
 
   public getSchemeCode(): string {

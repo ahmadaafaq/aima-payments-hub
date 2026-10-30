@@ -29,7 +29,7 @@ export async function fetchGatewayStatus(): Promise<GatewaysStatusResponse> {
           statusLabel: 'Sandbox Configured',
           canProcessLiveSandbox: true,
           configuredDetails: {
-            merchantId: 'T945221',
+            merchantId: 'T1202993',
             schemeCode: 'FIRST',
             testAmountLimits: '₹1.00 – ₹10.00',
             testCredentialsHint: 'Bank login: test / test',

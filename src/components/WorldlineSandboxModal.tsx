@@ -151,7 +151,7 @@ export const WorldlineSandboxModal: React.FC<WorldlineSandboxModalProps> = ({
   const consumerData = checkoutPayload?.consumerData;
   const testAmount = consumerData?.items?.[0]?.amount || '2.00';
   const schemeCode = consumerData?.items?.[0]?.itemId || 'FIRST';
-  const merchantId = consumerData?.merchantId || 'T945221';
+  const merchantId = consumerData?.merchantId || 'T1202993';
 
   const isSdkReady = sdkStatus === 'ready';
   const canUseLiveSdk = isSdkReady && useLiveSdk;

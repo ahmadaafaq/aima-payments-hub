@@ -76,7 +76,7 @@ export const StakeholderDemoGuide: React.FC<StakeholderDemoGuideProps> = ({
                 Worldline / Paynimo Sandbox Payment
               </h4>
               <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                Processes a real sandbox transaction using AIMA test credentials (<strong>Merchant: T945221</strong>, <strong>Scheme: FIRST</strong>).
+                Processes a real sandbox transaction using AIMA test credentials (<strong>Merchant: T1202993</strong>, <strong>Scheme: FIRST</strong>).
               </p>
               <ul className="text-[11px] text-slate-600 space-y-1.5 list-disc list-inside mb-4">
                 <li>Server generates secure SHA-256 token</li>
@@ -239,7 +239,7 @@ export const StakeholderDemoGuide: React.FC<StakeholderDemoGuideProps> = ({
               Manual Sandbox Test Procedure (Step-by-Step)
             </h4>
           </div>
-          <span className="text-[11px] font-mono text-amber-400">Merchant Code: T945221</span>
+          <span className="text-[11px] font-mono text-amber-400">Merchant Code: T1202993</span>
         </div>
 
         <ol className="space-y-3 text-xs text-slate-300 list-decimal list-inside leading-relaxed">
