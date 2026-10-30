@@ -178,7 +178,7 @@ export class WorldlinePaynimoAdapter {
         enableNewWindowFlow: false,
       },
       consumerData: {
-        deviceId: 'WEBSH2', // SHA-256 deviceId format
+        deviceId: 'WEBSH1', // WEBSH1 = SHA-256 (WEBSH2 is SHA-512)
         token: token,
         returnUrl: `${appUrl}/api/payments/worldline/callback`,
         responseHandler: 'handleWorldlineResponse',
