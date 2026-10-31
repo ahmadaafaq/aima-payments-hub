@@ -155,8 +155,9 @@ paymentRouter.post('/payments/worldline/initiate', (req: Request, res: Response)
     return res.status(404).json({ error: 'Transaction not found' });
   }
 
-  // App URL resolution (Cloud Run / dev server)
-  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  // App URL resolution (respecting reverse proxies / HTTPS headers)
+  const proto = req.get('x-forwarded-proto') || (req.get('host')?.includes('localhost') ? req.protocol : 'https');
+  const appUrl = process.env.APP_URL || `${proto}://${req.get('host')}`;
 
   try {
     const payload = worldlineAdapter.prepareCheckoutPayload(txn, appUrl);
@@ -587,7 +588,8 @@ paymentRouter.post('/payments/ccavenue/initiate', (req: Request, res: Response):
     return res.status(404).json({ error: 'Transaction not found' });
   }
 
-  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  const proto = req.get('x-forwarded-proto') || (req.get('host')?.includes('localhost') ? req.protocol : 'https');
+  const appUrl = process.env.APP_URL || `${proto}://${req.get('host')}`;
 
   try {
     const payload = ccavenueAdapter.preparePaymentRequest(txn, appUrl);

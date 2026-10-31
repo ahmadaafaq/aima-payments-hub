@@ -2878,7 +2878,8 @@ paymentRouter.post("/payments/worldline/initiate", (req, res) => {
   if (!txn) {
     return res.status(404).json({ error: "Transaction not found" });
   }
-  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+  const proto = req.get("x-forwarded-proto") || (req.get("host")?.includes("localhost") ? req.protocol : "https");
+  const appUrl = process.env.APP_URL || `${proto}://${req.get("host")}`;
   try {
     const payload = worldlineAdapter.prepareCheckoutPayload(txn, appUrl);
     txn.auditTrail.push({
@@ -3186,7 +3187,8 @@ paymentRouter.post("/payments/ccavenue/initiate", (req, res) => {
   if (!txn) {
     return res.status(404).json({ error: "Transaction not found" });
   }
-  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+  const proto = req.get("x-forwarded-proto") || (req.get("host")?.includes("localhost") ? req.protocol : "https");
+  const appUrl = process.env.APP_URL || `${proto}://${req.get("host")}`;
   try {
     const payload = ccavenueAdapter.preparePaymentRequest(txn, appUrl);
     txn.auditTrail.push({
@@ -4409,6 +4411,7 @@ if (process.env.WORLDLINE_ENVIRONMENT !== "production") {
   }
 }
 var app = express();
+app.set("trust proxy", 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.get(["/pay", "/api/pay"], handleCommonPay);
