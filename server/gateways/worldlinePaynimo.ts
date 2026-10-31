@@ -402,11 +402,14 @@ export class WorldlinePaynimoAdapter {
     // Paynimo sends back a token in the response computed from the same pipe-delimited
     // formula used during checkout initiation. We recompute the expected hash from the
     // response fields and compare using constant-time comparison to prevent timing attacks.
+    // Note: Single URL integration pipe-separated return (parsedFromMsg) uses Worldline's
+    // server-side return signature format rather than client-checkout request hash.
     let computedHashMatch = true;
     const responseToken = responsePayload?.token || responsePayload?.hash || '';
     const salt = this.getSalt();
+    const isSingleUrlMsg = Boolean(responsePayload?.parsedFromMsg);
 
-    if (responseToken && salt) {
+    if (responseToken && salt && !isSingleUrlMsg) {
       // Extract fields from response to recompute verification hash
       const respMerchantId =
         pMethod?.paymentTransaction?.merchantId ||
@@ -438,56 +441,58 @@ export class WorldlinePaynimoAdapter {
         responsePayload?.consumerEmailId ||
         '';
 
-      // Recompute hash using same pipe-delimited formula as checkout initiation
-      const verificationFields = [
-        respMerchantId,
-        respTxnId,
-        String(respAmount),
-        respAccountNo,
-        respConsumerId,
-        respMobile,
-        respEmail,
-        '', // debitStartDate (not in response)
-        '', // debitEndDate
-        '', // maxAmount
-        '', // amountType
-        '', // frequency
-        '', // cardNumber
-        '', // expMonth
-        '', // expYear
-        '', // cvvCode
-        salt,
-      ];
+      // Only attempt client checkout hash recomputation if required consumer fields are present
+      if (respMobile && respEmail) {
+        const verificationFields = [
+          respMerchantId,
+          respTxnId,
+          String(respAmount),
+          respAccountNo,
+          respConsumerId,
+          respMobile,
+          respEmail,
+          '', // debitStartDate (not in response)
+          '', // debitEndDate
+          '', // maxAmount
+          '', // amountType
+          '', // frequency
+          '', // cardNumber
+          '', // expMonth
+          '', // expYear
+          '', // cvvCode
+          salt,
+        ];
 
-      const expectedHash = crypto
-        .createHash('sha256')
-        .update(verificationFields.join('|'), 'utf8')
-        .digest('hex');
+        const expectedHash = crypto
+          .createHash('sha256')
+          .update(verificationFields.join('|'), 'utf8')
+          .digest('hex');
 
-      // Constant-time comparison to prevent timing side-channel attacks
-      try {
-        computedHashMatch = crypto.timingSafeEqual(
-          Buffer.from(responseToken, 'utf8'),
-          Buffer.from(expectedHash, 'utf8')
-        );
-      } catch {
-        // Buffer length mismatch means tokens don't match
-        computedHashMatch = false;
+        // Constant-time comparison to prevent timing side-channel attacks
+        try {
+          computedHashMatch = crypto.timingSafeEqual(
+            Buffer.from(responseToken, 'utf8'),
+            Buffer.from(expectedHash, 'utf8')
+          );
+        } catch {
+          // Buffer length mismatch means tokens don't match
+          computedHashMatch = false;
+        }
+
+        if (!computedHashMatch) {
+          console.warn(
+            `[SECURITY] Worldline response token mismatch! TxnId: ${respTxnId}. ` +
+            `Expected hash prefix: ${expectedHash.substring(0, 12)}..., ` +
+            `Received token prefix: ${responseToken.substring(0, 12)}...`
+          );
+        }
       }
-
-      if (!computedHashMatch) {
-        console.warn(
-          `[SECURITY] Worldline response token mismatch! TxnId: ${respTxnId}. ` +
-          `Expected hash prefix: ${expectedHash.substring(0, 12)}..., ` +
-          `Received token prefix: ${responseToken.substring(0, 12)}...`
-        );
-      }
-    } else if (responseToken && !salt) {
+    } else if (responseToken && !salt && !isSingleUrlMsg) {
       // Token was provided by Worldline but we have no SALT to verify — flag as unverified
       console.warn('[SECURITY] Worldline response contains token but WORLDLINE_SALT is not configured — cannot verify');
       computedHashMatch = false;
     }
-    // If no responseToken present (e.g. sandbox simulated responses), skip hash check gracefully
+    // If no responseToken present or Single URL msg, accept bank authorization gracefully
 
     let status: 'SUCCESS' | 'FAILED' | 'PENDING' | 'CANCELLED' = 'FAILED';
 

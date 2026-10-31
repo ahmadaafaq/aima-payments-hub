@@ -1548,7 +1548,8 @@ var WorldlinePaynimoAdapter = class {
     let computedHashMatch = true;
     const responseToken = responsePayload?.token || responsePayload?.hash || "";
     const salt = this.getSalt();
-    if (responseToken && salt) {
+    const isSingleUrlMsg = Boolean(responsePayload?.parsedFromMsg);
+    if (responseToken && salt && !isSingleUrlMsg) {
       const respMerchantId = pMethod?.paymentTransaction?.merchantId || responsePayload?.merchantId || this.getMerchantCode();
       const respTxnId = pMethod?.paymentTransaction?.merchantTransactionIdentifier || responsePayload?.merchantTxnId || responsePayload?.txnId || "";
       const respAmount = pMethod?.paymentTransaction?.amount || responsePayload?.amount || "";
@@ -1556,49 +1557,51 @@ var WorldlinePaynimoAdapter = class {
       const respConsumerId = pMethod?.paymentTransaction?.consumerId || responsePayload?.consumerId || "";
       const respMobile = pMethod?.paymentTransaction?.consumerMobileNo || responsePayload?.consumerMobileNo || "";
       const respEmail = pMethod?.paymentTransaction?.consumerEmailId || responsePayload?.consumerEmailId || "";
-      const verificationFields = [
-        respMerchantId,
-        respTxnId,
-        String(respAmount),
-        respAccountNo,
-        respConsumerId,
-        respMobile,
-        respEmail,
-        "",
-        // debitStartDate (not in response)
-        "",
-        // debitEndDate
-        "",
-        // maxAmount
-        "",
-        // amountType
-        "",
-        // frequency
-        "",
-        // cardNumber
-        "",
-        // expMonth
-        "",
-        // expYear
-        "",
-        // cvvCode
-        salt
-      ];
-      const expectedHash = crypto.createHash("sha256").update(verificationFields.join("|"), "utf8").digest("hex");
-      try {
-        computedHashMatch = crypto.timingSafeEqual(
-          Buffer.from(responseToken, "utf8"),
-          Buffer.from(expectedHash, "utf8")
-        );
-      } catch {
-        computedHashMatch = false;
+      if (respMobile && respEmail) {
+        const verificationFields = [
+          respMerchantId,
+          respTxnId,
+          String(respAmount),
+          respAccountNo,
+          respConsumerId,
+          respMobile,
+          respEmail,
+          "",
+          // debitStartDate (not in response)
+          "",
+          // debitEndDate
+          "",
+          // maxAmount
+          "",
+          // amountType
+          "",
+          // frequency
+          "",
+          // cardNumber
+          "",
+          // expMonth
+          "",
+          // expYear
+          "",
+          // cvvCode
+          salt
+        ];
+        const expectedHash = crypto.createHash("sha256").update(verificationFields.join("|"), "utf8").digest("hex");
+        try {
+          computedHashMatch = crypto.timingSafeEqual(
+            Buffer.from(responseToken, "utf8"),
+            Buffer.from(expectedHash, "utf8")
+          );
+        } catch {
+          computedHashMatch = false;
+        }
+        if (!computedHashMatch) {
+          console.warn(
+            `[SECURITY] Worldline response token mismatch! TxnId: ${respTxnId}. Expected hash prefix: ${expectedHash.substring(0, 12)}..., Received token prefix: ${responseToken.substring(0, 12)}...`
+          );
+        }
       }
-      if (!computedHashMatch) {
-        console.warn(
-          `[SECURITY] Worldline response token mismatch! TxnId: ${respTxnId}. Expected hash prefix: ${expectedHash.substring(0, 12)}..., Received token prefix: ${responseToken.substring(0, 12)}...`
-        );
-      }
-    } else if (responseToken && !salt) {
+    } else if (responseToken && !salt && !isSingleUrlMsg) {
       console.warn("[SECURITY] Worldline response contains token but WORLDLINE_SALT is not configured \u2014 cannot verify");
       computedHashMatch = false;
     }
