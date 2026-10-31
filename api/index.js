@@ -1434,7 +1434,7 @@ var WorldlinePaynimoAdapter = class {
         deviceId: "WEBSH1",
         // WEBSH1 = SHA-256 (WEBSH2 is SHA-512)
         token,
-        returnUrl: `${appUrl}/api/payments/worldline/callback`,
+        returnUrl: `${appUrl}/api/payments/worldline/callback?txnId=${encodeURIComponent(transaction.id)}&orderId=${encodeURIComponent(transaction.orderId)}`,
         responseHandler: "handleWorldlineResponse",
         paymentMode: "all",
         merchantLogoUrl: `${appUrl}/logo.png`,
@@ -1461,6 +1461,67 @@ var WorldlinePaynimoAdapter = class {
     };
   }
   /**
+   * Robustly parses incoming callback payload from Worldline / Paynimo
+   * Supporting:
+   * 1. Single URL integration pipe-separated string (req.body.msg / req.query.msg)
+   * 2. Direct form fields (clnt_txn_ref, txnId, merchantTxnId, etc.)
+   * 3. Nested JSON payload ($.pnCheckout responseHandler format)
+   * 4. Query string parameters (txnId, orderId)
+   */
+  parseCallbackData(body, query = {}) {
+    let msgStr = "";
+    if (typeof body === "string") {
+      if (body.startsWith("msg=")) {
+        msgStr = decodeURIComponent(body.slice(4));
+      } else if (body.includes("|")) {
+        msgStr = body;
+      }
+    } else if (body?.msg || body?.MSG) {
+      msgStr = String(body.msg || body.MSG);
+    } else if (query?.msg || query?.MSG) {
+      msgStr = String(query.msg || query.MSG);
+    }
+    let parsedFromMsg = null;
+    if (msgStr && msgStr.includes("|")) {
+      const parts = msgStr.split("|");
+      parsedFromMsg = {
+        statusCode: parts[0]?.trim() || "",
+        statusMessage: parts[1]?.trim() || "",
+        errorMessage: parts[2]?.trim() || "",
+        clnt_txn_ref: parts[3]?.trim() || "",
+        bankCode: parts[4]?.trim() || "",
+        gatewayTransactionId: parts[5]?.trim() || "",
+        amount: parts[6]?.trim() || "",
+        clnt_rqst_meta: parts[7]?.trim() || "",
+        txnTime: parts[8]?.trim() || "",
+        authCode: parts[13]?.trim() || "",
+        token: parts[14]?.trim() || "",
+        rawMsg: msgStr
+      };
+    }
+    const pMethod = body?.paymentMethod?.paymentTransaction || body?.paymentMethod || body;
+    const txnId = parsedFromMsg?.clnt_txn_ref || query?.txnId || query?.transactionId || query?.clnt_txn_ref || query?.merchantTransactionIdentifier || pMethod?.merchantTransactionIdentifier || body?.clnt_txn_ref || body?.merchantTxnId || body?.merchantTransactionIdentifier || body?.txnId || body?.txn_id || body?.merch_txn_id || body?.transactionId || body?.consumerData?.txnId || "";
+    const orderId = query?.orderId || body?.orderId || body?.order_id || "";
+    const statusCode = parsedFromMsg?.statusCode || pMethod?.statusCode || body?.statusCode || body?.status || query?.status || "";
+    const statusMessage = parsedFromMsg?.statusMessage || parsedFromMsg?.errorMessage || pMethod?.statusMessage || pMethod?.errorMessage || body?.statusMessage || "";
+    const bankRef = parsedFromMsg?.bankCode || pMethod?.bankReferenceIdentifier || pMethod?.bankReference || body?.bankRef || "";
+    const authCode = parsedFromMsg?.authCode || pMethod?.authCode || body?.authCode || "";
+    const gatewayTxnId = parsedFromMsg?.gatewayTransactionId || pMethod?.identifier || body?.transactionId || "";
+    const token = parsedFromMsg?.token || body?.token || body?.hash || "";
+    return {
+      txnId: (txnId || "").trim(),
+      orderId: (orderId || "").trim(),
+      statusCode,
+      statusMessage,
+      bankRef,
+      authCode,
+      gatewayTxnId,
+      token,
+      parsedFromMsg,
+      rawPayload: body
+    };
+  }
+  /**
    * Verifies incoming callback response from Worldline / Paynimo
    * Status code meanings:
    * '0300': Success
@@ -1470,14 +1531,18 @@ var WorldlinePaynimoAdapter = class {
    * '0392': Aborted / Cancelled
    */
   verifyResponse(responsePayload) {
-    const pMethod = responsePayload?.paymentMethod || responsePayload;
+    if (typeof responsePayload === "string" || responsePayload?.msg || responsePayload?.MSG) {
+      const parsed = this.parseCallbackData(responsePayload);
+      responsePayload = { ...responsePayload, ...parsed.parsedFromMsg || {}, ...parsed };
+    }
+    const pMethod = responsePayload?.paymentMethod || responsePayload?.parsedFromMsg || responsePayload;
     const statusCode = String(
       pMethod?.paymentTransaction?.statusCode || responsePayload?.statusCode || responsePayload?.status || ""
     );
-    const statusMsg = pMethod?.paymentTransaction?.statusMessage || pMethod?.paymentTransaction?.errorMessage || responsePayload?.statusMessage || "";
-    const bankRef = pMethod?.paymentTransaction?.bankReferenceIdentifier || pMethod?.paymentTransaction?.bankReference || responsePayload?.bankRef || "";
+    const statusMsg = pMethod?.paymentTransaction?.statusMessage || pMethod?.paymentTransaction?.errorMessage || responsePayload?.statusMessage || responsePayload?.errorMessage || "";
+    const bankRef = pMethod?.paymentTransaction?.bankReferenceIdentifier || pMethod?.paymentTransaction?.bankReference || responsePayload?.bankRef || responsePayload?.bankReference || "";
     const authCode = pMethod?.paymentTransaction?.authCode || responsePayload?.authCode || "";
-    const gatewayTxnId = pMethod?.paymentTransaction?.identifier || responsePayload?.transactionId || "";
+    const gatewayTxnId = pMethod?.paymentTransaction?.identifier || responsePayload?.gatewayTransactionId || responsePayload?.transactionId || "";
     const mode = pMethod?.paymentTransaction?.paymentMode || responsePayload?.paymentMode || "NetBanking";
     const bankName = pMethod?.paymentTransaction?.bankName || responsePayload?.bankName || "Test Sandbox Bank";
     let computedHashMatch = true;
@@ -2869,12 +2934,40 @@ paymentRouter.post("/payments/create-order", (req, res) => {
     transaction
   });
 });
-paymentRouter.post("/payments/worldline/initiate", (req, res) => {
+var renderRedirectHtml = (redirectUrl, title, subtitle, isSuccess) => `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="0;url=${redirectUrl}">
+  <title>${title} - Redirecting...</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f8fafc; color: #1e293b; text-align: center; }
+    .card { background: white; padding: 2.5rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 420px; width: 90%; }
+    .spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: ${isSuccess ? "#10b981" : "#ef4444"}; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.25rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h2 { margin: 0 0 0.5rem; font-size: 1.25rem; color: ${isSuccess ? "#065f46" : "#991b1b"}; font-weight: 700; }
+    p { margin: 0 0 1.5rem; color: #64748b; font-size: 0.875rem; line-height: 1.5; }
+    a { display: inline-block; padding: 0.75rem 1.5rem; background: ${isSuccess ? "#002b49" : "#b91c1c"}; color: white; text-decoration: none; border-radius: 0.5rem; font-weight: 600; font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <h2>${title}</h2>
+    <p>${subtitle}</p>
+    <a href="${redirectUrl}">Click here if not redirected automatically</a>
+  </div>
+  <script>
+    window.location.replace(${JSON.stringify(redirectUrl)});
+  </script>
+</body>
+</html>`;
+paymentRouter.post("/payments/worldline/initiate", async (req, res) => {
   const { transactionId } = req.body;
   if (!transactionId) {
     return res.status(400).json({ error: "transactionId is required" });
   }
-  const txn = serverTransactionStore.getById(transactionId);
+  const txn = await serverTransactionStore.fetchById(transactionId) || serverTransactionStore.getById(transactionId);
   if (!txn) {
     return res.status(404).json({ error: "Transaction not found" });
   }
@@ -2900,18 +2993,60 @@ paymentRouter.post("/payments/worldline/initiate", (req, res) => {
     });
   }
 });
-paymentRouter.post("/payments/worldline/callback", async (req, res) => {
-  const callbackData = req.body;
-  const txnId = callbackData?.paymentMethod?.paymentTransaction?.merchantTransactionIdentifier || callbackData?.merchantTxnId || callbackData?.txnId || callbackData?.consumerData?.txnId;
-  if (!txnId) {
-    return res.status(400).json({ error: "Missing merchantTransactionIdentifier in callback" });
+paymentRouter.all(["/payments/worldline/callback", "/payments/worldline/callback/"], async (req, res) => {
+  const body = req.body || {};
+  const query = req.query || {};
+  const parsed = worldlineAdapter.parseCallbackData(body, query);
+  let txnId = parsed.txnId;
+  let orderId = parsed.orderId;
+  let existingTxn;
+  if (txnId) {
+    existingTxn = await serverTransactionStore.fetchById(txnId);
   }
-  const existingTxn = serverTransactionStore.getById(txnId);
+  if (!existingTxn && (orderId || txnId)) {
+    existingTxn = await serverTransactionStore.fetchByOrderId(orderId || txnId);
+  }
   if (!existingTxn) {
-    return res.status(404).json({ error: `Transaction ${txnId} not found` });
+    existingTxn = serverTransactionStore.getAll().find(
+      (t) => txnId && (t.id === txnId || t.orderId === txnId) || orderId && t.orderId === orderId
+    );
   }
-  const idempotencyKey = `WL-CB-${txnId}-${callbackData?.paymentMethod?.paymentTransaction?.identifier || "DIRECT"}`;
+  if (!existingTxn) {
+    const allTxns = await serverTransactionStore.fetchAll();
+    existingTxn = allTxns.find((t) => t.gateway === "WORLDLINE_PAYNIMO" && t.status === "PENDING");
+  }
+  const isBrowserRequest = req.headers.accept?.includes("text/html") || req.headers["sec-fetch-dest"] === "document" || req.headers["sec-fetch-mode"] === "navigate" || req.method === "GET" || Boolean(req.headers["content-type"]?.includes("application/x-www-form-urlencoded"));
+  const proto = req.get("x-forwarded-proto") || (req.get("host")?.includes("localhost") ? req.protocol : "https");
+  const appUrl = process.env.APP_URL || `${proto}://${req.get("host")}`;
+  if (!existingTxn) {
+    console.warn("[Worldline Callback] Transaction not found for payload:", { txnId, orderId, body, query });
+    if (isBrowserRequest) {
+      const fallbackUrl = `${appUrl}/?error=TRANSACTION_NOT_FOUND`;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(renderRedirectHtml(
+        fallbackUrl,
+        "Transaction Not Found",
+        "We could not locate your payment record. Redirecting to home...",
+        false
+      ));
+    }
+    return res.status(404).json({ error: `Transaction ${txnId || orderId || "unknown"} not found` });
+  }
+  txnId = existingTxn.id;
+  const idempotencyKey = `WL-CB-${txnId}-${parsed.gatewayTxnId || "DIRECT"}`;
   if (serverTransactionStore.isCallbackProcessed(idempotencyKey) && existingTxn.status !== "PENDING") {
+    if (isBrowserRequest) {
+      const session = paymentSessionStore.getByOrderId(existingTxn.orderId) || (existingTxn.sessionToken ? paymentSessionStore.getAnyByToken(existingTxn.sessionToken) : void 0);
+      const targetReturnUrl = session?.returnUrl || existingTxn.returnUrl;
+      const redirectTarget = targetReturnUrl || `${appUrl}/?tab=history&txnId=${encodeURIComponent(existingTxn.id)}&status=${encodeURIComponent(existingTxn.status)}`;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(renderRedirectHtml(
+        redirectTarget,
+        existingTxn.status === "SUCCESS" ? "Payment Verified" : "Transaction Status",
+        "Redirecting back to your application...",
+        existingTxn.status === "SUCCESS"
+      ));
+    }
     return res.json({
       success: true,
       idempotent: true,
@@ -2919,24 +3054,54 @@ paymentRouter.post("/payments/worldline/callback", async (req, res) => {
       transaction: existingTxn
     });
   }
-  const verification = worldlineAdapter.verifyResponse(callbackData);
+  const verification = worldlineAdapter.verifyResponse(parsed.parsedFromMsg || body);
   const updatedTxn = await serverTransactionStore.updateVerifiedGatewayTransaction(txnId, {
     status: verification.status,
     statusReason: verification.statusReason,
-    bankReference: verification.bankReference,
-    authCode: verification.authCode,
-    gatewayTransactionId: verification.gatewayTransactionId,
-    gatewayStatusCode: verification.gatewayStatusCode,
-    paymentMode: verification.paymentMode,
-    bankName: verification.bankName,
+    bankReference: verification.bankReference || parsed.bankRef,
+    authCode: verification.authCode || parsed.authCode,
+    gatewayTransactionId: verification.gatewayTransactionId || parsed.gatewayTxnId,
+    gatewayStatusCode: verification.gatewayStatusCode || parsed.statusCode,
+    paymentMode: verification.paymentMode || "NetBanking",
+    bankName: verification.bankName || "Worldline Sandbox Bank",
     verificationMethod: "HASH_VALIDATION"
   });
   serverTransactionStore.markCallbackProcessed(idempotencyKey);
   if (verification.status === "SUCCESS") {
-    const session = paymentSessionStore.getByOrderId(updatedTxn.orderId);
+    const session = paymentSessionStore.getByOrderId(updatedTxn.orderId) || (existingTxn.sessionToken ? paymentSessionStore.getAnyByToken(existingTxn.sessionToken) : void 0);
     if (session) {
       paymentSessionStore.markCompleted(session.sessionToken);
     }
+  }
+  if (isBrowserRequest) {
+    const session = paymentSessionStore.getByOrderId(updatedTxn.orderId) || (existingTxn.sessionToken ? paymentSessionStore.getAnyByToken(existingTxn.sessionToken) : void 0);
+    const targetReturnUrl = session?.returnUrl || existingTxn.returnUrl;
+    let finalUrl;
+    if (targetReturnUrl) {
+      try {
+        const returnUrlObj = new URL(targetReturnUrl);
+        returnUrlObj.searchParams.set("orderId", updatedTxn.orderId);
+        returnUrlObj.searchParams.set("transactionId", updatedTxn.id);
+        returnUrlObj.searchParams.set("reference", updatedTxn.applicationRef);
+        returnUrlObj.searchParams.set("status", updatedTxn.status);
+        returnUrlObj.searchParams.set("gateway", "WORLDLINE_PAYNIMO");
+        returnUrlObj.searchParams.set("amount", String(updatedTxn.totalAmount));
+        if (updatedTxn.bankReference) returnUrlObj.searchParams.set("bankReference", updatedTxn.bankReference);
+        finalUrl = returnUrlObj.toString();
+      } catch {
+        const sep = targetReturnUrl.includes("?") ? "&" : "?";
+        finalUrl = `${targetReturnUrl}${sep}status=${updatedTxn.status}&orderId=${encodeURIComponent(updatedTxn.orderId)}&transactionId=${encodeURIComponent(updatedTxn.id)}&reference=${encodeURIComponent(updatedTxn.applicationRef)}&amount=${encodeURIComponent(String(updatedTxn.totalAmount))}`;
+      }
+    } else {
+      finalUrl = `${appUrl}/?tab=history&txnId=${encodeURIComponent(updatedTxn.id)}&status=${encodeURIComponent(updatedTxn.status)}`;
+    }
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.status(200).send(renderRedirectHtml(
+      finalUrl,
+      updatedTxn.status === "SUCCESS" ? "Worldline Payment Successful" : "Payment Status Updated",
+      "Redirecting you back to your application...",
+      updatedTxn.status === "SUCCESS"
+    ));
   }
   res.json({
     success: true,
@@ -3068,34 +3233,6 @@ paymentRouter.all(["/payments/hdfc-collectnow/callback", "/payments/hdfc-collect
     );
   }
   const targetReturnUrl = rawTargetReturnUrl || session?.returnUrl || txn?.returnUrl || "https://research.aima.in/registration";
-  const renderRedirectHtml = (redirectUrl, title, subtitle, isSuccess) => `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0;url=${redirectUrl}">
-  <title>${title} - Redirecting...</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f8fafc; color: #1e293b; text-align: center; }
-    .card { background: white; padding: 2.5rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 420px; width: 90%; }
-    .spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: ${isSuccess ? "#10b981" : "#ef4444"}; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.25rem; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    h2 { margin: 0 0 0.5rem; font-size: 1.25rem; color: ${isSuccess ? "#065f46" : "#991b1b"}; font-weight: 700; }
-    p { margin: 0 0 1.5rem; color: #64748b; font-size: 0.875rem; line-height: 1.5; }
-    a { display: inline-block; padding: 0.75rem 1.5rem; background: ${isSuccess ? "#002b49" : "#b91c1c"}; color: white; text-decoration: none; border-radius: 0.5rem; font-weight: 600; font-size: 0.875rem; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="spinner"></div>
-    <h2>${title}</h2>
-    <p>${subtitle}</p>
-    <a href="${redirectUrl}">Click here if not redirected automatically</a>
-  </div>
-  <script>
-    window.location.replace(${JSON.stringify(redirectUrl)});
-  </script>
-</body>
-</html>`;
   if (isFailure || !razorpay_signature) {
     const failureReason = errorDescription || "Payment declined or cancelled by candidate";
     console.warn(`[HDFC Collect Now Callback] Payment failure recorded for order ${razorpay_order_id || txn?.orderId || "unknown"}: ${failureReason}`);

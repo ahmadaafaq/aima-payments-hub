@@ -180,7 +180,7 @@ export class WorldlinePaynimoAdapter {
       consumerData: {
         deviceId: 'WEBSH1', // WEBSH1 = SHA-256 (WEBSH2 is SHA-512)
         token: token,
-        returnUrl: `${appUrl}/api/payments/worldline/callback`,
+        returnUrl: `${appUrl}/api/payments/worldline/callback?txnId=${encodeURIComponent(transaction.id)}&orderId=${encodeURIComponent(transaction.orderId)}`,
         responseHandler: 'handleWorldlineResponse',
         paymentMode: 'all',
         merchantLogoUrl: `${appUrl}/logo.png`,
@@ -208,6 +208,127 @@ export class WorldlinePaynimoAdapter {
   }
 
   /**
+   * Robustly parses incoming callback payload from Worldline / Paynimo
+   * Supporting:
+   * 1. Single URL integration pipe-separated string (req.body.msg / req.query.msg)
+   * 2. Direct form fields (clnt_txn_ref, txnId, merchantTxnId, etc.)
+   * 3. Nested JSON payload ($.pnCheckout responseHandler format)
+   * 4. Query string parameters (txnId, orderId)
+   */
+  public parseCallbackData(body: any, query: any = {}) {
+    let msgStr = '';
+    if (typeof body === 'string') {
+      if (body.startsWith('msg=')) {
+        msgStr = decodeURIComponent(body.slice(4));
+      } else if (body.includes('|')) {
+        msgStr = body;
+      }
+    } else if (body?.msg || body?.MSG) {
+      msgStr = String(body.msg || body.MSG);
+    } else if (query?.msg || query?.MSG) {
+      msgStr = String(query.msg || query.MSG);
+    }
+
+    let parsedFromMsg: any = null;
+    if (msgStr && msgStr.includes('|')) {
+      const parts = msgStr.split('|');
+      parsedFromMsg = {
+        statusCode: parts[0]?.trim() || '',
+        statusMessage: parts[1]?.trim() || '',
+        errorMessage: parts[2]?.trim() || '',
+        clnt_txn_ref: parts[3]?.trim() || '',
+        bankCode: parts[4]?.trim() || '',
+        gatewayTransactionId: parts[5]?.trim() || '',
+        amount: parts[6]?.trim() || '',
+        clnt_rqst_meta: parts[7]?.trim() || '',
+        txnTime: parts[8]?.trim() || '',
+        authCode: parts[13]?.trim() || '',
+        token: parts[14]?.trim() || '',
+        rawMsg: msgStr,
+      };
+    }
+
+    const pMethod = body?.paymentMethod?.paymentTransaction || body?.paymentMethod || body;
+
+    const txnId =
+      parsedFromMsg?.clnt_txn_ref ||
+      (query?.txnId as string) ||
+      (query?.transactionId as string) ||
+      (query?.clnt_txn_ref as string) ||
+      (query?.merchantTransactionIdentifier as string) ||
+      pMethod?.merchantTransactionIdentifier ||
+      body?.clnt_txn_ref ||
+      body?.merchantTxnId ||
+      body?.merchantTransactionIdentifier ||
+      body?.txnId ||
+      body?.txn_id ||
+      body?.merch_txn_id ||
+      body?.transactionId ||
+      body?.consumerData?.txnId ||
+      '';
+
+    const orderId =
+      (query?.orderId as string) ||
+      body?.orderId ||
+      body?.order_id ||
+      '';
+
+    const statusCode =
+      parsedFromMsg?.statusCode ||
+      pMethod?.statusCode ||
+      body?.statusCode ||
+      body?.status ||
+      (query?.status as string) ||
+      '';
+
+    const statusMessage =
+      parsedFromMsg?.statusMessage ||
+      parsedFromMsg?.errorMessage ||
+      pMethod?.statusMessage ||
+      pMethod?.errorMessage ||
+      body?.statusMessage ||
+      '';
+
+    const bankRef =
+      parsedFromMsg?.bankCode ||
+      pMethod?.bankReferenceIdentifier ||
+      pMethod?.bankReference ||
+      body?.bankRef ||
+      '';
+
+    const authCode =
+      parsedFromMsg?.authCode ||
+      pMethod?.authCode ||
+      body?.authCode ||
+      '';
+
+    const gatewayTxnId =
+      parsedFromMsg?.gatewayTransactionId ||
+      pMethod?.identifier ||
+      body?.transactionId ||
+      '';
+
+    const token =
+      parsedFromMsg?.token ||
+      body?.token ||
+      body?.hash ||
+      '';
+
+    return {
+      txnId: (txnId || '').trim(),
+      orderId: (orderId || '').trim(),
+      statusCode,
+      statusMessage,
+      bankRef,
+      authCode,
+      gatewayTxnId,
+      token,
+      parsedFromMsg,
+      rawPayload: body,
+    };
+  }
+
+  /**
    * Verifies incoming callback response from Worldline / Paynimo
    * Status code meanings:
    * '0300': Success
@@ -228,8 +349,14 @@ export class WorldlinePaynimoAdapter {
     gatewayTransactionId?: string;
     computedHashMatch: boolean;
   } {
+    // If string or contains msg, parse it first
+    if (typeof responsePayload === 'string' || responsePayload?.msg || responsePayload?.MSG) {
+      const parsed = this.parseCallbackData(responsePayload);
+      responsePayload = { ...responsePayload, ...(parsed.parsedFromMsg || {}), ...parsed };
+    }
+
     // Paynimo response structure can be direct or nested inside paymentMethod
-    const pMethod = responsePayload?.paymentMethod || responsePayload;
+    const pMethod = responsePayload?.paymentMethod || responsePayload?.parsedFromMsg || responsePayload;
     const statusCode = String(
       pMethod?.paymentTransaction?.statusCode ||
       responsePayload?.statusCode ||
@@ -240,12 +367,14 @@ export class WorldlinePaynimoAdapter {
       pMethod?.paymentTransaction?.statusMessage ||
       pMethod?.paymentTransaction?.errorMessage ||
       responsePayload?.statusMessage ||
+      responsePayload?.errorMessage ||
       '';
 
     const bankRef =
       pMethod?.paymentTransaction?.bankReferenceIdentifier ||
       pMethod?.paymentTransaction?.bankReference ||
       responsePayload?.bankRef ||
+      responsePayload?.bankReference ||
       '';
 
     const authCode =
@@ -255,6 +384,7 @@ export class WorldlinePaynimoAdapter {
 
     const gatewayTxnId =
       pMethod?.paymentTransaction?.identifier ||
+      responsePayload?.gatewayTransactionId ||
       responsePayload?.transactionId ||
       '';
 

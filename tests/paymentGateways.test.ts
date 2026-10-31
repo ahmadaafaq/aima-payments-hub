@@ -217,6 +217,38 @@ runTest('Should skip hash verification when no response token is present', () =>
   assert.strictEqual(verified.status, 'SUCCESS');
 });
 
+// 7e. Pipe-delimited Single URL integration msg response parsing
+runTest('Should parse pipe-delimited Single URL msg response correctly', () => {
+  const adapter = new WorldlinePaynimoAdapter();
+  const mockMsg = '0300|Success|NA|TXN-20261031-9988|10|TPSL9876543|2.00|NA|31-10-2026 13:30:00|NA|NA|NA|NA|AUTH-7788|';
+  const parsed = adapter.parseCallbackData({ msg: mockMsg });
+
+  assert.strictEqual(parsed.txnId, 'TXN-20261031-9988');
+  assert.strictEqual(parsed.statusCode, '0300');
+  assert.strictEqual(parsed.gatewayTxnId, 'TPSL9876543');
+  assert.strictEqual(parsed.authCode, 'AUTH-7788');
+
+  const verified = adapter.verifyResponse({ msg: mockMsg });
+  assert.strictEqual(verified.status, 'SUCCESS');
+  assert.strictEqual(verified.gatewayStatusCode, '0300');
+  assert.strictEqual(verified.authCode, 'AUTH-7788');
+  assert.strictEqual(verified.gatewayTransactionId, 'TPSL9876543');
+});
+
+// 7f. Query param and direct form field extraction
+runTest('Should extract txnId and orderId from query and direct body fields', () => {
+  const adapter = new WorldlinePaynimoAdapter();
+  const parsed = adapter.parseCallbackData(
+    { clnt_txn_ref: 'TXN-FORM-01', statusCode: '0300' },
+    { orderId: 'ORD-9900' }
+  );
+
+  assert.strictEqual(parsed.txnId, 'TXN-FORM-01');
+  assert.strictEqual(parsed.orderId, 'ORD-9900');
+  assert.strictEqual(parsed.statusCode, '0300');
+});
+
+
 // -----------------------------------------------------------------------------
 // TEST SUITE 2: CCAvenue Adapter & Live Kit Safety
 // -----------------------------------------------------------------------------
